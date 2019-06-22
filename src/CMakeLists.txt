@@ -15,18 +15,15 @@ include_directories(
     "${CMAKE_CURRENT_SOURCE_DIR}/../include"
 )
 
-add_executable(canale WIN32
-    main.cc
-)
-set_target_properties(canale PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
-    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+
+add_library(canale SHARED
+    canale.cc
 )
 target_link_libraries(canale PUBLIC
     Qt5::Core
-    Qt5::Widgets
     Qt5::SerialPort
 )
 
 
-
+add_subdirectory(cli/)
+add_subdirectory(gui/)
