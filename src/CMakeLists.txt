@@ -10,7 +10,10 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 find_package(Qt5 COMPONENTS Core Widgets SerialPort REQUIRED)
 
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
+include_directories(
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../include"
+)
 
 add_executable(canale WIN32
     main.cc
