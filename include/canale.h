@@ -8,12 +8,24 @@
 #ifndef CANALE_H
 #define CANALE_H
 
+#include <stdio.h>
+
 #ifndef __cplusplus
 extern "C"
 {
 #endif
 
-#include <stdio.h>
+#if defined(WIN32) || defined(_WIN32)
+#   if defined(CA_EXPORTS)
+#       define CA_API __declspec(dllexport)
+#   else
+#       define CA_API __declspec(dllimport)
+#   endif
+#elif defined(__GNUC__) || defined(__clang__)
+#   define CA_API __attribute__((visibility("default")))
+#else
+#   define CA_API
+#endif
 
 /// An opaque handle to an instance of CANale.
 typedef struct CAinst CAinst;
@@ -39,7 +51,6 @@ typedef struct CAconfig
 {
     /// The name of the serial port connected to the master board.
     /// "COM_" on Windows, "tty_" on *nixes.
-    /// Set to null to use a default.
     const char *serialPort;
 
     /// The baud rate of the serial port.
@@ -59,23 +70,23 @@ typedef struct CAconfig
 /// Creates a new instance of CANale given its configuration parameters.
 /// Returns null on error; if `config->logHandler` is set, it is invoked
 /// with a description of the error.
-CAinst *caInit(const CAconfig *config);
+CA_API CAinst *caInit(const CAconfig *config);
 
 /// Destroys a CANale instance.
 /// Does nothing if `inst` is null.
-void caHalt(CAinst *inst);
+CA_API void caHalt(CAinst *inst);
 
 
 /// Flashes the ELF file at `elfPath` to the device board with id `devId`.
 /// Calls CANale progress and log handlers as appropriate.
 /// Returns true if flash succeeded, or false on error.
-int caFlash(CAinst *ca, unsigned devId, const char *elfPath);
+CA_API int caFlash(CAinst *ca, unsigned devId, const char *elfPath);
 
 /// Same as `caFlash()` but reads the ELF file from a file pointer.
-int caFlashFp(CAinst *ca, unsigned devId, FILE *elfFp);
+CA_API int caFlashFp(CAinst *ca, unsigned devId, FILE *elfFp);
 
 /// Same as `caFlash()` but reads the ELF file from memory.
-int caFlashMem(FILE *fp, unsigned devId, unsigned elfSize, unsigned char elfData[elfSize]);
+CA_API int caFlashMem(CAinst *ca, unsigned devId, unsigned long elfSize, const unsigned char elfData[elfSize]);
 
 
 #ifndef __cplusplus

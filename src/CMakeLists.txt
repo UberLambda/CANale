@@ -19,6 +19,9 @@ include_directories(
 add_library(canale SHARED
     canale.cc
 )
+set_target_properties(canale PROPERTIES
+    DEFINE_SYMBOL "CA_EXPORTS"
+)
 target_link_libraries(canale PUBLIC
     Qt5::Core
     Qt5::SerialPort
