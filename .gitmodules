@@ -1,3 +1,7 @@
 [submodule "src/3rdparty/ELFIO"]
 	path = src/3rdparty/ELFIO
 	url = https://github.com/serge1/ELFIO
+[submodule "src/3rdparty/CANnuccia"]
+	path = src/3rdparty/CANnuccia
+	url = ssh://git@github.com/UberLambda/CANnuccia
+	branch = devel

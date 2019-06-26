@@ -28,6 +28,7 @@ target_link_libraries(canale PUBLIC
     Qt5::Core
     Qt5::SerialPort
     ELFIO
+    CANnuccia
 )
 
 add_subdirectory(cli/)
