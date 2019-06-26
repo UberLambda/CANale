@@ -19,7 +19,7 @@ add_subdirectory(3rdparty/)
 
 add_library(canale SHARED
     canale.cc
-    mapper.cc
+    comms.cc
 )
 set_target_properties(canale PROPERTIES
     DEFINE_SYMBOL "CA_EXPORTS"
