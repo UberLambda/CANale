@@ -8,8 +8,8 @@
 #ifndef COMMS_HH
 #define COMMS_HH
 
-#include <cstdint>
-#include <cstddef>
+#include <QSharedPointer>
+#include <QCanBusDevice>
 #include <QObject>
 #include <QTime>
 
@@ -22,14 +22,33 @@ struct DeviceStats
     uint32_t pageSize; ///< The size of a flash page in bytes.
 };
 
-/// The interface to the CANnuccia master board.
+/// Implementation of the CANnuccia protocol over `QCanBusDevice`.
 class Comms : public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(QSharedPointer<QCanBusDevice> can READ can WRITE setCan)
 
 public:
     Comms(QObject *parent=nullptr);
     ~Comms();
+
+    /// Gets the link used to communicate with the CANnuccia network.
+    inline QSharedPointer<QCanBusDevice> can()
+    {
+        return m_can;
+    }
+
+    /// Sets the link to use to communicate with the CANnuccia network.
+    inline void setCan(QSharedPointer<QCanBusDevice> can)
+    {
+        m_can = can;
+    }
+
+    /// Returns whether a CAN link with the CANnuccia network is present or not.
+    inline operator bool() const
+    {
+        return bool(m_can);
+    }
 
     /// Sends a PROG_REQ to the device with id `devId`, followed by an UNLOCK;
     /// waits for ACKs from the device.
@@ -53,15 +72,8 @@ public:
     void flashPage(unsigned devId, uint32_t pageAddr, size_t pageLen, const uint8_t pageData[],
                    QTime timeout=QTime(0, 0, 1));
 
-signals:
-    /// Emitted when a CAN packet is to be written to the master board.
-    /// `id` is the destination CAN EID, in bxCAN format. `dataLen` will be <= 8.
-    void canTX(uint32_t id, size_t dataLen, const uint8_t data[]);
-
-public slots:
-    /// Trigger this when a CAN packet is read from the master board.
-    /// `id` is the sender's CAN EID, in bxCAN format. `dataLen` must be <= 8.
-    void canRX(uint32_t id, size_t dataLen, const uint8_t data[]);
+private:
+    QSharedPointer<QCanBusDevice> m_can;
 };
 
 }

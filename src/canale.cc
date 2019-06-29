@@ -9,13 +9,13 @@
 
 #include <cstdio>
 #include <QtGlobal>
-#include <QSerialPort>
-#include <QSerialPortInfo>
+#include <QCanBus>
+#include <QCanBusDevice>
 #include "moc_canale.cpp"
 
 CAinst::CAinst(QObject *parent)
     : QObject(parent),
-      logHandler(nullptr), progressHandler(nullptr), m_serial()
+      logHandler(nullptr), progressHandler(nullptr), m_can(nullptr), m_canConnected(false)
 {
     connect(this, &CAinst::logged, [this](CAlogLevel level, QString message)
     {
@@ -31,47 +31,85 @@ CAinst::CAinst(QObject *parent)
             progressHandler(qPrintable(descr), progress);
         }
     });
-
-    emit logged(CA_DEBUG, "CANale begin");
 }
 
 CAinst::~CAinst()
 {
-    emit logged(CA_DEBUG, "CANale end");
+    if(m_can && m_canConnected)
+    {
+        m_can->disconnectDevice();
+    }
+    emit logged(CA_INFO, "CANale halt");
 }
 
-bool CAinst::init(QSharedPointer<QIODevice> device)
+bool CAinst::init(const CAconfig &config)
 {
-    if(!device)
+    logHandler = config.logHandler;
+    progressHandler = config.progressHandler;
+
+    emit logged(CA_INFO, "CANale init");
+
+    if(!config.canInterface || config.canInterface[0] == '\0')
     {
-        emit logged(CA_ERROR, "Master board link not open");
+        emit logged(CA_ERROR, "No CAN interface specified");
         return false;
     }
 
-    bool readable = device->isReadable(), writable = device->isWritable();
-    if(!readable || !writable)
+    QStringList canToks = QString(config.canInterface).split('|');
+    if(canToks.length() != 2)
     {
-        QString error = QString("Master board link %1%2%3")
-                .arg(readable ? "" : "not readable")
-                .arg((!readable && !writable) ? " and " : "")
-                .arg(writable ? "" : "not writable");
-        emit logged(CA_ERROR, error);
+        emit logged(CA_ERROR,
+                    QString("Invalid CAN interface \"%1\"").arg(config.canInterface));
+        return false;
     }
 
-    emit logged(CA_INFO, "Master board link open");
-    m_serial = device;
+    emit logged(CA_INFO, QString("Creating CAN link on interface \"%1\"").arg(config.canInterface));
+
+    QString err;
+    QSharedPointer<QCanBusDevice> canDev(QCanBus::instance()->createDevice(canToks[0], canToks[1], &err));
+    if(!canDev)
+    {
+        emit logged(CA_ERROR,
+                    QString("Failed to create CAN link: %2").arg(err));
+        return false;
+    }
+
+    return init(canDev);
+}
+
+bool CAinst::init(QSharedPointer<QCanBusDevice> can)
+{
+    if(!can)
+    {
+        emit logged(CA_ERROR, "CAN link not present");
+        return false;
+    }
+
+    emit logged(CA_INFO, "Connecting to CAN link...");
+    if(!can->connectDevice())
+    {
+        emit logged(CA_ERROR,
+                    QString("Failed to connect to CAN link. Error [%1]: %2")
+                    .arg(can->error()).arg(can->errorString()));
+        return false;
+    }
+
+    emit logged(CA_INFO, "CAN link estabilished");
+    m_can = can;
     return true;
 }
 
 bool CAinst::flashELF(unsigned devId, unsigned long elfSize, const unsigned char elfData[])
 {
     // FIXME IMPLEMENT
+    if(!elfData || !elfSize)
+    {
+        return false;
+    }
     return false;
 }
 
 // ---- C API to implement for include/canale.h --------------------------------
-
-static constexpr qint32 DEFAULT_SERIAL_BAUD = 115200;
 
 CAinst *caInit(const CAconfig *config)
 {
@@ -80,28 +118,8 @@ CAinst *caInit(const CAconfig *config)
         return nullptr;
     }
 
-    auto serial = QSharedPointer<QSerialPort>::create();
-    if(config->serialPort)
-    {
-        serial->setPortName(config->serialPort);
-    }
-    serial->setBaudRate(config->serialBaud ? qint32(config->serialBaud) : DEFAULT_SERIAL_BAUD);
-
-    if(!serial->open(QIODevice::ReadWrite))
-    {
-        if(config->logHandler)
-        {
-            QString error = QString("Failed to open serial \"%1\" for master board link: %2")
-                    .arg(config->serialPort).arg(serial->errorString());
-            config->logHandler(CA_ERROR, qPrintable(error));
-        }
-    }
-
     auto inst = new CAinst();
-    inst->logHandler = config->logHandler;
-    inst->progressHandler = config->progressHandler;
-
-    if(inst->init(serial))
+    if(inst->init(*config))
     {
         return inst;
     }

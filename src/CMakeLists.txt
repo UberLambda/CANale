@@ -8,7 +8,7 @@
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
-find_package(Qt5 COMPONENTS Core Widgets SerialPort REQUIRED)
+find_package(Qt5 COMPONENTS Core Widgets SerialBus REQUIRED)
 
 include_directories(
     "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -26,7 +26,7 @@ set_target_properties(canale PROPERTIES
 )
 target_link_libraries(canale PUBLIC
     Qt5::Core
-    Qt5::SerialPort
+    Qt5::SerialBus
     ELFIO
     CANnuccia
 )

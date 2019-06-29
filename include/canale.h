@@ -49,13 +49,11 @@ typedef void(*CAprogressHandler)(const char *descr, unsigned progress);
 /// Configuration flags for creating a CANale instance.
 typedef struct CAconfig
 {
-    /// The name of the serial port connected to the master board.
-    /// "COM_" on Windows, "tty_" on *nixes.
-    const char *serialPort;
-
-    /// The baud rate of the serial port.
-    /// Set to zero to use a default.
-    unsigned serialBaud;
+    /// The CAN interface to use to connect to the CANnuccia network, in the
+    /// format "<backend>|<interface>". <backend> is the name of the QtCanBus
+    /// plugin to use (ex. "socketcan"); <interface> is the CAN interface (ex.
+    /// "can0").
+    const char *canInterface;
 
     /// Called when a message is logged by CANale.
     /// Set to null to disable logging.

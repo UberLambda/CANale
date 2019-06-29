@@ -9,7 +9,7 @@
 
 extern "C"
 {
-#   include "common/can_msgs.h"
+#include "common/can_msgs.h"
 }
 #include "moc_comms.cpp"
 
@@ -17,16 +17,11 @@ namespace ca
 {
 
 Comms::Comms(QObject *parent)
-    : QObject(parent)
+    : QObject(parent), m_can(nullptr)
 {
 }
 
 Comms::~Comms() = default;
-
-void Comms::canRX(uint32_t id, size_t dataLen, const uint8_t data[])
-{
-    // FIXME IMPLEMENT
-}
 
 void Comms::progStart(unsigned devId, DeviceStats *outDeviceStats)
 {

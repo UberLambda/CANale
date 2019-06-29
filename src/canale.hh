@@ -12,6 +12,7 @@
 
 #include <QObject>
 #include <QSharedPointer>
+#include <QCanBusDevice>
 #include <QIODevice>
 
 struct CAinst : public QObject
@@ -40,11 +41,14 @@ signals:
     void progressed(QString descr, unsigned progress);
 
 public slots:
-    /// Initializes this CANale instance, given the [serial] device used to
-    /// communicate with the master board. The device should already be open in
-    /// read/write mode.
+    /// Initializes this CANale instance given its init configuration.
     /// Returns true on success or false otherwise.
-    bool init(QSharedPointer<QIODevice> device);
+    bool init(const CAconfig &config);
+
+    /// Initializes this CANale instance given its CAN link with the CANnuccia
+    /// network. Calls `can->connectDevice()`.
+    /// Returns true on success or false otherwise.
+    bool init(QSharedPointer<QCanBusDevice> can);
 
     /// Flashes the contents of an ELF file to the device board with id `devId`.
     /// Emits `progressed()` and `logged()` as appropriate.
@@ -52,7 +56,8 @@ public slots:
     bool flashELF(unsigned devId, unsigned long elfSize, const unsigned char elfData[]);
 
 private:
-    QSharedPointer<QIODevice> m_serial; ///< The link to the master board.
+    QSharedPointer<QCanBusDevice> m_can; ///< The link to the CAN network.
+    bool m_canConnected; ///< Did `m_can->connectDevice()` succeed?
 };
 
 namespace ca
