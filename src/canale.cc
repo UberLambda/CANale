@@ -11,7 +11,7 @@
 #include <QtGlobal>
 #include <QCanBus>
 #include <QCanBusDevice>
-#include <elfio/elfio.hpp>
+#include <elfio/elf_types.hpp>
 #include "util.hh"
 #include "moc_canale.cpp"
 
@@ -62,18 +62,19 @@ bool CAinst::init(const CAconfig &config)
     if(canToks.length() != 2)
     {
         emit logged(CA_ERROR,
-                    QString("Invalid CAN interface \"%1\"").arg(config.canInterface));
+                    QStringLiteral("Invalid CAN interface \"%1\"").arg(config.canInterface));
         return false;
     }
 
-    emit logged(CA_INFO, QString("Creating CAN link on interface \"%1\"").arg(config.canInterface));
+    emit logged(CA_INFO,
+                QStringLiteral("Creating CAN link on interface \"%1\"").arg(config.canInterface));
 
     QString err;
     QSharedPointer<QCanBusDevice> canDev(QCanBus::instance()->createDevice(canToks[0], canToks[1], &err));
     if(!canDev)
     {
         emit logged(CA_ERROR,
-                    QString("Failed to create CAN link: %2").arg(err));
+                    QStringLiteral("Failed to create CAN link: %1").arg(err));
         return false;
     }
 
@@ -92,7 +93,7 @@ bool CAinst::init(QSharedPointer<QCanBusDevice> can)
     if(!can->connectDevice())
     {
         emit logged(CA_ERROR,
-                    QString("Failed to connect to CAN link. Error [%1]: %2")
+                    QStringLiteral("Failed to connect to CAN link. Error [%1]: %2")
                     .arg(can->error()).arg(can->errorString()));
         return false;
     }
@@ -103,12 +104,70 @@ bool CAinst::init(QSharedPointer<QCanBusDevice> can)
     return true;
 }
 
+template <typename Num>
+inline static QString hexStr(Num num, int nDigits=0)
+{
+    return QStringLiteral("0x")
+            + QStringLiteral("%1").arg(num, nDigits, 16, QChar('0')).toUpper();
+}
+
+unsigned CAinst::listSegmentsToFlash(const ELFIO::elfio &elf, std::vector<ELFIO::segment *> &outSegments)
+{
+    emit logged(CA_DEBUG,
+                QStringLiteral("%1 ELF segments:").arg(elf.segments.size()));
+
+    QString segmMsg;
+    unsigned nOutput = 0;
+    for(unsigned i = 0; i < elf.segments.size(); i ++)
+    {
+        ELFIO::segment *segm = elf.segments[i];
+
+        segmMsg = QStringLiteral("> segment %1: ").arg(i);
+
+        if(segm->get_type() & PT_LOAD)
+        {
+            if(segm->get_file_size() > 0)
+            {
+                segmMsg += QStringLiteral("loadable, flash fileSize=%1B (out of memSize=%2B) at physAddr=%3")
+                            .arg(segm->get_file_size())
+                            .arg(segm->get_memory_size())
+                            .arg(hexStr(segm->get_physical_address(), 8));
+
+                outSegments.push_back(segm);
+                nOutput ++;
+            }
+            else
+            {
+                segmMsg += QStringLiteral("loadable but has fileSize=0B, skip");
+            }
+        }
+        else
+        {
+            segmMsg += "not loadable, skip";
+        }
+        emit logged(CA_DEBUG, segmMsg);
+    }
+
+    return nOutput;
+}
+
 bool CAinst::flashELF(unsigned devId, QByteArray elfData)
 {
     if(elfData.isNull() || elfData.isEmpty() || !m_comms)
     {
         return false;
     }
+
+    if(devId > 0xFFu)
+    {
+        emit logged(CA_ERROR,
+                    QStringLiteral("Invalid device id: %1").arg(hexStr(devId)));
+        return false;
+    }
+    uint8_t devId8 = static_cast<uint8_t>(devId);
+
+    emit logged(CA_INFO,
+                QStringLiteral("Flashing ELF to device %1...").arg(hexStr(devId8, 2)));
 
     ca::MemIStream elfDataStream(reinterpret_cast<uint8_t *>(elfData.data()),
                                  static_cast<size_t>(elfData.size()));
@@ -118,6 +177,17 @@ bool CAinst::flashELF(unsigned devId, QByteArray elfData)
         emit logged(CA_ERROR, "Failed to load ELF");
         return false;
     }
+
+    emit logged(CA_DEBUG,
+                QStringLiteral("ELF machine type: %1").arg(hexStr(elf.get_machine(), 4)));
+
+    std::vector<ELFIO::segment *> segmentsToFlash;
+    unsigned nSegmentsToFlash = listSegmentsToFlash(elf, segmentsToFlash);
+
+    // FIXME: Add this to a QFuture chain
+    m_comms->progStart(devId8);
+    // FIXME: build a page map, flash the pages
+    m_comms->progEnd(devId8);
 
     // FIXME IMPLEMENT
     return false;

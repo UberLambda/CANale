@@ -10,10 +10,12 @@
 
 #include "canale.h"
 
+#include <vector>
 #include <QObject>
 #include <QSharedPointer>
 #include <QCanBusDevice>
 #include <QByteArray>
+#include <elfio/elfio.hpp>
 #include "comms.hh"
 
 struct CAinst : public QObject
@@ -65,6 +67,15 @@ private:
     QSharedPointer<QCanBusDevice> m_can; ///< The link to the CAN network.
     bool m_canConnected; ///< Did `m_can->connectDevice()` succeed?
     ca::Comms *m_comms; ///< The CANnuccia protocol interface.
+
+    /// Appends the list of segments in `elf` that will have to be flashed.
+    /// Also logs some diagnostic output about `elf`.
+    /// Returns the number of segments appended to `outSegments`.
+    ///
+    /// Segments to be flashed have the PT_LOAD type and a `fileSize` greater
+    /// than zero; they will correspond to `fileSize` bytes to be written at
+    /// `physAddr` in the target device's flash.
+    unsigned listSegmentsToFlash(const ELFIO::elfio &elf, std::vector<ELFIO::segment *> &outSegments);
 };
 
 namespace ca
