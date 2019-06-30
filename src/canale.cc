@@ -11,11 +11,14 @@
 #include <QtGlobal>
 #include <QCanBus>
 #include <QCanBusDevice>
+#include <elfio/elfio.hpp>
+#include "util.hh"
 #include "moc_canale.cpp"
 
 CAinst::CAinst(QObject *parent)
     : QObject(parent),
-      logHandler(nullptr), progressHandler(nullptr), m_can(nullptr), m_canConnected(false)
+      logHandler(nullptr), progressHandler(nullptr), m_can(nullptr),
+      m_canConnected(false), m_comms(new ca::Comms(this))
 {
     connect(this, &CAinst::logged, [this](CAlogLevel level, QString message)
     {
@@ -96,16 +99,27 @@ bool CAinst::init(QSharedPointer<QCanBusDevice> can)
 
     emit logged(CA_INFO, "CAN link estabilished");
     m_can = can;
+    m_comms->setCan(m_can);
     return true;
 }
 
-bool CAinst::flashELF(unsigned devId, unsigned long elfSize, const unsigned char elfData[])
+bool CAinst::flashELF(unsigned devId, QByteArray elfData)
 {
-    // FIXME IMPLEMENT
-    if(!elfData || !elfSize)
+    if(elfData.isNull() || elfData.isEmpty() || !m_comms)
     {
         return false;
     }
+
+    ca::MemIStream elfDataStream(reinterpret_cast<uint8_t *>(elfData.data()),
+                                 static_cast<size_t>(elfData.size()));
+    ELFIO::elfio elf;
+    if(!elf.load(elfDataStream))
+    {
+        emit logged(CA_ERROR, "Failed to load ELF");
+        return false;
+    }
+
+    // FIXME IMPLEMENT
     return false;
 }
 
@@ -137,7 +151,14 @@ void caHalt(CAinst *inst)
 
 int caFlash(CAinst *ca, unsigned devId, const char *elfPath)
 {
-    return caFlashFp(ca, devId, fopen(elfPath, "r"));
+    FILE *fp = fopen(elfPath, "rb");
+    if(!fp)
+    {
+        return 0;
+    }
+    int result = caFlashFp(ca, devId, fp);
+    fclose(fp);
+    return result;
 }
 
 int caFlashFp(CAinst *ca, unsigned devId, FILE *elfFp)
@@ -150,9 +171,11 @@ int caFlashFp(CAinst *ca, unsigned devId, FILE *elfFp)
     fseek(elfFp, 0, SEEK_END);
     auto elfSize = static_cast<unsigned long>(ftell(elfFp));
     fseek(elfFp, 0, SEEK_SET);
-
     auto elfData = new unsigned char[elfSize];
-    int result = caFlashMem(ca, devId, elfSize, elfData);
+    size_t readSize = fread(elfData, 1, elfSize, elfFp);
+
+    int result = caFlashMem(ca, devId, readSize, elfData);
+
     delete[] elfData;
     return result;
 }
@@ -163,5 +186,7 @@ int caFlashMem(CAinst *ca, unsigned devId, unsigned long elfSize, const unsigned
     {
         return 0;
     }
-    return ca->flashELF(devId, elfSize, elfData);
+    QByteArray elfDataArr(reinterpret_cast<const char *>(elfData),
+                          static_cast<int>(elfSize)); // (copies the data)
+    return ca->flashELF(devId, elfDataArr);
 }

@@ -13,7 +13,8 @@
 #include <QObject>
 #include <QSharedPointer>
 #include <QCanBusDevice>
-#include <QIODevice>
+#include <QByteArray>
+#include "comms.hh"
 
 struct CAinst : public QObject
 {
@@ -29,7 +30,10 @@ public:
     ~CAinst();
 
     /// Returns whether this CANale instance was properly `init()`ed or not.
-    inline operator bool() const;
+    inline operator bool() const
+    {
+        return m_comms;
+    }
 
 signals:
     /// Emitted when a new message is to be logged.
@@ -53,11 +57,14 @@ public slots:
     /// Flashes the contents of an ELF file to the device board with id `devId`.
     /// Emits `progressed()` and `logged()` as appropriate.
     /// Returns true if flash succeeded, or false on error.
-    bool flashELF(unsigned devId, unsigned long elfSize, const unsigned char elfData[]);
+    ///
+    /// The CAinst must be `init()`ed for this operation to succeed.
+    bool flashELF(unsigned devId, QByteArray elfData);
 
 private:
     QSharedPointer<QCanBusDevice> m_can; ///< The link to the CAN network.
     bool m_canConnected; ///< Did `m_can->connectDevice()` succeed?
+    ca::Comms *m_comms; ///< The CANnuccia protocol interface.
 };
 
 namespace ca
