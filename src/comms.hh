@@ -8,10 +8,13 @@
 #ifndef COMMS_HH
 #define COMMS_HH
 
-#include <QSharedPointer>
-#include <QCanBusDevice>
+#include <utility>
+#include <unordered_map>
 #include <QObject>
-#include <QTime>
+#include <QByteArray>
+#include <QCanBusDevice>
+#include <QSharedPointer>
+#include "canale.h"
 
 namespace ca
 {
@@ -20,6 +23,8 @@ namespace ca
 struct DeviceStats
 {
     uint32_t pageSize; ///< The size of a flash page in bytes.
+    uint16_t nFlashPages; ///< The total number of `pageSize`d flash pages.
+    uint16_t elfMachine; ///< The ELF machine type (`e_machine`).
 };
 
 /// Implementation of the CANnuccia protocol over `QCanBusDevice`.
@@ -29,6 +34,10 @@ class Comms : public QObject
     Q_PROPERTY(QSharedPointer<QCanBusDevice> can READ can WRITE setCan)
 
 public:
+    /// The ID of a CANnuccia device.
+    using DevId = uint8_t;
+
+
     Comms(QObject *parent=nullptr);
     ~Comms();
 
@@ -41,7 +50,14 @@ public:
     /// Sets the link to use to communicate with the CANnuccia network.
     inline void setCan(QSharedPointer<QCanBusDevice> can)
     {
+        if(m_can)
+        {
+            disconnect(m_can.get(), &QCanBusDevice::framesReceived,
+                       this, &Comms::framesReceived);
+        }
         m_can = can;
+        connect(m_can.get(), &QCanBusDevice::framesReceived,
+                this, &Comms::framesReceived);
     }
 
     /// Returns whether a CAN link with the CANnuccia network is present or not.
@@ -50,30 +66,72 @@ public:
         return bool(m_can);
     }
 
-    /// Sends a PROG_REQ to the device with id `devId`, followed by an UNLOCK;
-    /// waits for ACKs from the device.
-    /// Outputs stats about the device to `outDeviceStats` if it is not null.
-    ///
-    /// Keeps trying until the PROG_REQ is properly acknowledged (potentially
-    /// stalling forever).
-    void progStart(unsigned devId, DeviceStats *outDeviceStats);
+public slots:
+    /// Sends a PROG_REQ to the device with id `devId`. If and when the PROG_REQ_RESP
+    /// is received, sends an UNLOCK command. Finally, if and when UNLOCKED is
+    /// received, emits `progStarted()`.
+    void progStart(DevId devId);
 
-    /// Sends a PROG_DONE to the device with id devId; waits for ACK from the device.
-    /// keepwaits for an acknowledgement for the device.
-    ///
-    /// Keeps trying until a PROG_DONE_ACK is received (potentially stalling
-    /// forever).
-    void progEnd(unsigned devId);
+    /// Sends a PROG_DONE to the device with id `devId`.
+    /// Emits `progEnded()` if and when PROG_DONE_ACK is received.
+    void progEnd(DevId devId);
 
     /// Writes to the flash page at `pageAddr` in the device with id `devId`.
     /// Calculates the CRC16/XMODEM of the writes and compares it with the target;
-    /// if they don't match or no response is received within the `timeout`
-    /// (forever if `timeout.isNull()`) retries writing - potentially retrying forever.
-    void flashPage(unsigned devId, uint32_t pageAddr, size_t pageLen, const uint8_t pageData[],
-                   QTime timeout=QTime(0, 0, 1));
+    /// emits `pageFlashed()` if and when the checksum reponse is received from the
+    /// device.
+    void flashPage(DevId devId, uint32_t pageAddr, QByteArray pageData);
+
+signals:
+    /// Emitted after programming a device is started (PROG_REQ_RESP + UNLOCKED).
+    /// Outputs the stats obtained from the PROG_REQ_RESP.
+    void progStarted(DevId devId, DeviceStats outDeviceStats);
+
+    /// Emitted after a device exits programming mode (PROG_DONE_ACK).
+    void progEnded(DevId devId);
+
+    /// Emitted after a device has sent the CRC16/XMODEM of a page after it being
+    /// written, it matched the expected value, and it successfully committed
+    /// the writes to flash.
+    void pageFlashed(DevId devId, uint32_t pageAddr);
+
+    /// Emitted after a device has sent the CRC16/XMODEM of a page after it being
+    /// written, it did not match the expected value, and so no writes were
+    /// committed to that page.
+    void pageFlashErrored(DevId devId, uint32_t pageAddr, uint16_t expectedCrc, uint16_t recvdCrc);
+
 
 private:
     QSharedPointer<QCanBusDevice> m_can;
+
+    struct DeviceState
+    {
+        static constexpr uint32_t NO_PAGE = static_cast<uint32_t>(-1);
+
+        DeviceStats stats{0, 0, 0}; ///< Stats about this device
+        std::unordered_map<uint32_t, QByteArray> pageFlashData{}; ///< page address -> data to flash there
+        uint32_t selPageAddr; ///< Currently-selected page (as indicated by PAGE_SELECTED)
+                              ///< or NO_PAGE if no page is being flashed currently
+    };
+    std::unordered_map<DevId, DeviceState> m_deviceStates;
+
+    /// Sends a command to the device at `devId` asking it to SELECT_PAGE
+    /// the flash page at `pageAddr`.
+    void sendSelectPageCmd(DevId devId, uint32_t pageAddr);
+
+    /// Sends WRITE commands to write `pageData` to the device at `devId`.
+    /// The WRITEs will have <=8 bytes of payload data each.
+    void sendPageWriteCmds(DevId devId, QByteArray pageData);
+
+    /// Sends a SELECT_PAGE command to the device at `devId`, selecting the first
+    /// page in `m_deviceStates[devId].pageFlashData` whose address is NOT
+    /// `m_deviceStats[devId].selPageAddr`.
+    /// Does nothing if there are no pages to flash for the device.
+    void selectNextPageToFlash(DevId devId);
+
+private slots:
+    /// Handles CAN frames being received.
+    void framesReceived();
 };
 
 }

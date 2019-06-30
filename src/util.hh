@@ -42,6 +42,37 @@ inline uint16_t crc16(unsigned long len, const uint8_t data[])
     return uint16_t(crc);
 }
 
+
+/// Reads a little-endian U16 from 2 bytes.
+///
+/// (Ported from CANnuccia/src/common/util.h)
+inline uint16_t readU16LE(const uint8_t bytes[])
+{
+    return bytes[0] | uint16_t(bytes[1] << 8);
+}
+
+/// Reads a little-endian U32 from 4 bytes.
+///
+/// (Ported from CANnuccia/src/common/util.h)
+inline uint32_t readU32LE(const uint8_t bytes[])
+{
+    return bytes[0]
+            | uint32_t(bytes[1] << 8)
+            | uint32_t(bytes[2] << 16)
+            | uint32_t(bytes[3] << 24);
+}
+
+/// Writes a little-endian U32 to 4 bytes.
+///
+/// (Ported from CANnuccia/src/common/util.h)
+inline void writeU32LE(uint8_t outBytes[], uint32_t u32)
+{
+    outBytes[0] = (u32 & 0x000000FFu);
+    outBytes[1] = (u32 & 0x0000FF00u) >> 8;
+    outBytes[2] = (u32 & 0x00FF0000u) >> 16;
+    outBytes[3] = (u32 & 0xFF000000u) >> 24;
+}
+
 }
 
 #endif // UTIL_HH
