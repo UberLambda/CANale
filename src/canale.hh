@@ -10,29 +10,44 @@
 
 #include "canale.h"
 
-#include <vector>
+#include <functional>
 #include <QObject>
 #include <QSharedPointer>
 #include <QCanBusDevice>
 #include <QByteArray>
+#include <QList>
 #include <elfio/elfio.hpp>
 #include "comms.hh"
+
+namespace ca
+{
+    using Inst = ::CAinst;
+
+    /// A C++ equivalent of a `CAprogressHandler`.
+    using ProgressHandler = std::function<void(const char *description, int progress,
+                                               CAdevId devId, void *userData)>;
+}
 
 struct CAinst : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(CAlogHandler logHandler MEMBER logHandler)
-    Q_PROPERTY(CAprogressHandler progressHandler MEMBER progressHandler)
 
 public:
+
     CAlogHandler logHandler;
-    CAprogressHandler progressHandler;
 
     CAinst(QObject *parent=nullptr);
     ~CAinst();
 
     /// Returns whether this CANale instance was properly `init()`ed or not.
     inline operator bool() const
+    {
+        return bool(m_comms);
+    }
+
+    /// Returns the Comms associated to this CAinst.
+    inline ca::Comms *comms()
     {
         return m_comms;
     }
@@ -41,10 +56,6 @@ signals:
     /// Emitted when a new message is to be logged.
     /// Called whenever `logHandler` is to be called.
     void logged(CAlogLevel level, QString message);
-
-    /// Emitted when some progress is made (`CAprogressHandler` equivalent).
-    /// Called whenever `progressHandler` is to be called.
-    void progressed(QString descr, unsigned progress);
 
 public slots:
     /// Initializes this CANale instance given its init configuration.
@@ -56,12 +67,24 @@ public slots:
     /// Returns true on success or false otherwise.
     bool init(QSharedPointer<QCanBusDevice> can);
 
-    /// Flashes the contents of an ELF file to the device board with id `devId`.
-    /// Emits `progressed()` and `logged()` as appropriate.
-    /// Returns true if flash succeeded, or false on error.
-    ///
-    /// The CAinst must be `init()`ed for this operation to succeed.
-    bool flashELF(unsigned devId, QByteArray elfData);
+
+    /// Sends PROG_START commands to all devices in `devIds`, followed by UNLOCKs as
+    /// they respond.
+    /// Calls the log handler and given progress handler (if any) as appropriate.
+    void startDevices(QList<CAdevId> devIds,
+                      ca::ProgressHandler onProgress, void *onProgressUserData);
+
+    /// Sends PROG_DONE commands to all devices in `devIds`, waiting for their ACK.
+    /// Calls the log handler and given progress handler (if any) as appropriate.
+    void stopDevices(QList<CAdevId> devIds,
+                     ca::ProgressHandler onProgress, void *onProgressUserData);
+
+    /// Flashes an ELF file (whose contents are in `elfData`) to the device board with
+    /// id `devId`.
+    /// Calls the log handler and given progress handler (if any) as appropriate.
+    void flashELF(CAdevId devId, QByteArray elfData,
+                  ca::ProgressHandler onProgress, void *onProgressUserData);
+
 
 private:
     QSharedPointer<QCanBusDevice> m_can; ///< The link to the CAN network.
@@ -76,11 +99,6 @@ private:
     /// than zero; they will correspond to `fileSize` bytes to be written at
     /// `physAddr` in the target device's flash.
     unsigned listSegmentsToFlash(const ELFIO::elfio &elf, std::vector<ELFIO::segment *> &outSegments);
-};
-
-namespace ca
-{
-    using Inst = ::CAinst;
 };
 
 #endif // CANALE_HH

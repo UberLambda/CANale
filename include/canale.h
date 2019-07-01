@@ -9,6 +9,7 @@
 #define CANALE_H
 
 #include <stdio.h>
+#include <stdint.h>
 
 #ifndef __cplusplus
 extern "C"
@@ -43,9 +44,6 @@ typedef enum CAlogLevel
 /// An handler for CANale log messages.
 typedef void(*CAlogHandler)(CAlogLevel level, const char *message);
 
-/// An handler for CANale progress events. `progress` is 0 to 100.
-typedef void(*CAprogressHandler)(const char *descr, unsigned progress);
-
 /// Configuration flags for creating a CANale instance.
 typedef struct CAconfig
 {
@@ -59,10 +57,6 @@ typedef struct CAconfig
     /// Set to null to disable logging.
     CAlogHandler logHandler;
 
-    /// Called when some progress is made by CANale.
-    /// Set to null to disable progress reporting.
-    CAprogressHandler progressHandler;
-
 } CAconfig;
 
 /// Creates a new instance of CANale given its configuration parameters.
@@ -75,17 +69,37 @@ CA_API CAinst *caInit(const CAconfig *config);
 CA_API void caHalt(CAinst *inst);
 
 
-/// Flashes the ELF file at `elfPath` to the device board with id `devId`.
-/// Calls CANale progress and log handlers as appropriate.
-/// Returns true if flash succeeded, or false on error.
-CA_API int caFlash(CAinst *ca, unsigned devId, const char *elfPath);
+/// The id of a CANnuccia device.
+typedef uint8_t CAdevId;
 
-/// Same as `caFlash()` but reads the ELF file from a file pointer.
-CA_API int caFlashFp(CAinst *ca, unsigned devId, FILE *elfFp);
+/// An handler for CANale progress events.
+/// `progress` is usually 0 to 100. Unless an error occurs, the handler is
+/// guaranteed to be called with `progress=100` when the operation completes;
+/// a negative progress value is passed whenever an error occurs.
+typedef void(*CAprogressHandler)(const char *message, int progress,
+                                 CAdevId devId, void *userData);
 
-/// Same as `caFlash()` but reads the ELF file from memory.
-CA_API int caFlashMem(CAinst *ca, unsigned devId, unsigned long elfSize, const unsigned char elfData[elfSize]);
+/// Sends PROG_START commands to all devices in `devIds`, followed by UNLOCKs as
+/// they respond.
+/// Calls the log handler and given progress handler (if any) as appropriate.
+CA_API void caStartDevices(CAinst *ca, unsigned long nDevIds, const CAdevId devIds[nDevIds],
+                           CAprogressHandler onProgress, void *onProgressUserData);
 
+/// Sends PROG_DONE commands to all devices in `devIds`, waiting for their ACK.
+/// Calls the log handler and given progress handler (if any) as appropriate.
+CA_API void caStopDevices(CAinst *ca, unsigned long nDevIds, const CAdevId devIds[nDevIds],
+                          CAprogressHandler onProgress, void *onProgressUserData);
+
+
+
+/// Flashes an ELF file (whose contents are in `elf`) to the device board with
+/// id `devId`.
+/// Calls the log handler and given progress handler (if any) as appropriate.
+///
+/// Sends a PROG_START to the device, but not a PROG_DONE!
+CA_API void caFlashELF(CAinst *ca, CAdevId devId,
+                       unsigned long elfLen, const char elf[elfLen],
+                       CAprogressHandler onProgress, void *onProgressUserData);
 
 #ifndef __cplusplus
 }
