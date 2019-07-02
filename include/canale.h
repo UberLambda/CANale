@@ -76,8 +76,7 @@ typedef uint8_t CAdevId;
 /// `progress` is usually 0 to 100. Unless an error occurs, the handler is
 /// guaranteed to be called with `progress=100` when the operation completes;
 /// a negative progress value is passed whenever an error occurs.
-typedef void(*CAprogressHandler)(const char *message, int progress,
-                                 CAdevId devId, void *userData);
+typedef void(*CAprogressHandler)(const char *message, int progress, void *userData);
 
 /// Sends PROG_START commands to all devices in `devIds`, followed by UNLOCKs as
 /// they respond.

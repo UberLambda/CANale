@@ -14,7 +14,7 @@
 #include <QByteArray>
 #include <QCanBusDevice>
 #include <QSharedPointer>
-#include "canale.h"
+#include "types.hh"
 
 namespace ca
 {
@@ -34,8 +34,8 @@ class Comms : public QObject
     Q_PROPERTY(QSharedPointer<QCanBusDevice> can READ can WRITE setCan)
 
 public:
-    /// The ID of a CANnuccia device.
-    using DevId = uint8_t;
+    /// The id of a CANnuccia device.
+    using DevId = CAdevId;
 
 
     Comms(QObject *parent=nullptr);
@@ -56,8 +56,11 @@ public:
                        this, &Comms::framesReceived);
         }
         m_can = can;
-        connect(m_can.get(), &QCanBusDevice::framesReceived,
-                this, &Comms::framesReceived);
+        if(can)
+        {
+            connect(m_can.get(), &QCanBusDevice::framesReceived,
+                    this, &Comms::framesReceived);
+        }
     }
 
     /// Returns whether a CAN link with the CANnuccia network is present or not.

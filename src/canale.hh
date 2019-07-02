@@ -11,6 +11,9 @@
 #include "canale.h"
 
 #include <functional>
+#include <memory>
+#include <vector>
+#include <deque>
 #include <QObject>
 #include <QSharedPointer>
 #include <QCanBusDevice>
@@ -18,14 +21,11 @@
 #include <QList>
 #include <elfio/elfio.hpp>
 #include "comms.hh"
+#include "comm_op.hh"
 
 namespace ca
 {
     using Inst = ::CAinst;
-
-    /// A C++ equivalent of a `CAprogressHandler`.
-    using ProgressHandler = std::function<void(const char *description, int progress,
-                                               CAdevId devId, void *userData)>;
 }
 
 struct CAinst : public QObject
@@ -34,7 +34,6 @@ struct CAinst : public QObject
     Q_PROPERTY(CAlogHandler logHandler MEMBER logHandler)
 
 public:
-
     CAlogHandler logHandler;
 
     CAinst(QObject *parent=nullptr);
@@ -47,7 +46,7 @@ public:
     }
 
     /// Returns the Comms associated to this CAinst.
-    inline ca::Comms *comms()
+    inline QSharedPointer<ca::Comms> comms()
     {
         return m_comms;
     }
@@ -68,28 +67,20 @@ public slots:
     bool init(QSharedPointer<QCanBusDevice> can);
 
 
-    /// Sends PROG_START commands to all devices in `devIds`, followed by UNLOCKs as
-    /// they respond.
-    /// Calls the log handler and given progress handler (if any) as appropriate.
-    void startDevices(QList<CAdevId> devIds,
-                      ca::ProgressHandler onProgress, void *onProgressUserData);
-
-    /// Sends PROG_DONE commands to all devices in `devIds`, waiting for their ACK.
-    /// Calls the log handler and given progress handler (if any) as appropriate.
-    void stopDevices(QList<CAdevId> devIds,
-                     ca::ProgressHandler onProgress, void *onProgressUserData);
-
-    /// Flashes an ELF file (whose contents are in `elfData`) to the device board with
-    /// id `devId`.
-    /// Calls the log handler and given progress handler (if any) as appropriate.
-    void flashELF(CAdevId devId, QByteArray elfData,
-                  ca::ProgressHandler onProgress, void *onProgressUserData);
+    /// Enqueues an operation to be performed on this `CAinst`.
+    /// The `CAinst` will take ownership of the pointer.
+    ///
+    /// It will be started as soon as possible; check the operation's progress
+    /// handler for its status.
+    void addOperation(ca::Operation *operation);
 
 
 private:
     QSharedPointer<QCanBusDevice> m_can; ///< The link to the CAN network.
     bool m_canConnected; ///< Did `m_can->connectDevice()` succeed?
-    ca::Comms *m_comms; ///< The CANnuccia protocol interface.
+    QSharedPointer<ca::Comms> m_comms; ///< The CANnuccia protocol interface.
+
+    std::deque<std::unique_ptr<ca::Operation>> m_operations; ///< All currently-ongoing operations.
 
     /// Appends the list of segments in `elf` that will have to be flashed.
     /// Also logs some diagnostic output about `elf`.
