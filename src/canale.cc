@@ -145,38 +145,34 @@ unsigned CAinst::listSegmentsToFlash(const ELFIO::elfio &elf, std::vector<ELFIO:
 }
 
 
-#define PROGRESS_FAIL(message, devId) do { \
+#define PROGRESS_FAIL(caInst, message, devId) do { \
+    if(caInst) { emit caInst->logged(CA_ERROR, message); } \
     if(onProgress) { onProgress(message, -1, devId, onProgressUserData); } \
 } while(false)
 
-#define LOG_PROGRESS_FAIL(message, devId) do { \
-    emit logged(CA_ERROR, message); \
-    PROGRESS_FAIL(message, devId); \
-} while(false);
-
-#define EXPECT(expr, message, devId) do { Q_ASSERT(expr); \
-    if(!(expr)) { LOG_PROGRESS_FAIL(message, devId); return; } \
+#define EXPECT(caInst, expr, message, devId) do { Q_ASSERT(expr); \
+    if(!(expr)) { PROGRESS_FAIL(caInst, message, devId); return; } \
 } while(false)
 
 void CAinst::startDevices(QList<CAdevId> devIds,
                           ca::ProgressHandler onProgress, void *onProgressUserData)
 {
-    EXPECT(m_comms, "CAN link not open", 0xFF);
+    EXPECT(this, m_comms, "CAN link not open", 0xFF);
     // FIXME IMPLEMENT
 }
 
 void CAinst::stopDevices(QList<CAdevId> devIds,
                          ca::ProgressHandler onProgress, void *onProgressUserData)
 {
-    EXPECT(m_comms, "CAN link not open", 0xFF);
+    EXPECT(this, m_comms, "CAN link not open", 0xFF);
     // FIXME IMPLEMENT
 }
 
 void CAinst::flashELF(CAdevId devId, QByteArray elfData,
                       ca::ProgressHandler onProgress, void *onProgressUserData)
 {
-    EXPECT(!(elfData.isNull() || elfData.isEmpty()), "Invalid arguments", devId);
-    EXPECT(m_comms, "CAN link not open", devId);
+    EXPECT(this, !(elfData.isNull() || elfData.isEmpty()), "Invalid arguments", devId);
+    EXPECT(this, m_comms, "CAN link not open", devId);
 
     emit logged(CA_INFO,
                 QStringLiteral("Flashing ELF to device %1...").arg(hexStr(devId, 2)));
@@ -186,7 +182,7 @@ void CAinst::flashELF(CAdevId devId, QByteArray elfData,
     ELFIO::elfio elf;
     if(!elf.load(elfDataStream))
     {
-        PROGRESS_FAIL("Failed to load ELF", devId);
+        PROGRESS_FAIL(this, "Failed to load ELF", devId);
         return;
     }
 
@@ -232,8 +228,7 @@ void caStartDevices(CAinst *ca, unsigned long nDevIds, const CAdevId devIds[],
 {
     if(!ca || !(devIds || nDevIds == 0))
     {
-        Q_ASSERT(false && "Invalid arguments");
-        PROGRESS_FAIL("Invalid arguments", 0xFF);
+        PROGRESS_FAIL(ca, "Invalid arguments", 0xFF);
         return;
     }
 
@@ -252,8 +247,7 @@ void caStopDevices(CAinst *ca, unsigned long nDevIds, const CAdevId devIds[],
 {
     if(!ca || !(devIds || nDevIds == 0))
     {
-        Q_ASSERT(false && "Invalid arguments");
-        PROGRESS_FAIL("Invalid arguments", 0xFF);
+        PROGRESS_FAIL(ca, "Invalid arguments", 0xFF);
         return;
     }
 
@@ -273,8 +267,7 @@ void caFlashELF(CAinst *ca, CAdevId devId,
 {
     if(!ca)
     {
-        Q_ASSERT(false && "Invalid arguments");
-        PROGRESS_FAIL("Invalid arguments", devId);
+        PROGRESS_FAIL(ca, "Invalid arguments", devId);
         return;
     }
 
