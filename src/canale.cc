@@ -8,13 +8,13 @@
 #include "canale.hh"
 
 #include <cstdio>
+#include <algorithm>
 #include <QtGlobal>
 #include <QCanBus>
 #include <QCanBusDevice>
 #include <elfio/elf_types.hpp>
 #include "util.hh"
 #include "moc_canale.cpp"
-
 
 CAinst::CAinst(QObject *parent)
     : QObject(parent),
@@ -147,8 +147,16 @@ unsigned CAinst::listSegmentsToFlash(const ELFIO::elfio &elf, std::vector<ELFIO:
 void CAinst::addOperation(ca::Operation *operation)
 {
     m_operations.emplace_back(operation);
-    // FIXME ADD ERASE HOOK!
-    m_operations.back()->start(m_comms);
+    ca::Operation *op = m_operations.back().get();
+
+    // Remove the task from the queue as soon as it is done
+    connect(&op->onProgress(), &ca::ProgressHandler::done, [op, this]()
+    {
+        std::remove_if(m_operations.begin(), m_operations.end(),
+                       [op](auto &opPtr) { return opPtr.get() == op; });
+    });
+
+    op->start(m_comms);
 }
 
 // ---- C API to implement for include/canale.h --------------------------------

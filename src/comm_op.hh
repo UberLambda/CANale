@@ -36,20 +36,15 @@ public slots:
     /// Starts the operation. It will use `Comms` to communicate from/to devices.
     void start(QSharedPointer<Comms> comms);
 
-protected:
-    /// Invoked when the operation is `start()`ed.
-    virtual void started() = 0;
-
-    /// Call this when some progress is made (progress=0..100) or if the operation is
-    /// aborted (set progress to a negative value).
-    /// Also invokes the internal progress handler.
-    void progress(QString message, int progress);
-
     /// Returns the progress handler passed to the constructor.
     inline ProgressHandler &onProgress()
     {
         return m_onProgress;
     }
+
+protected:
+    /// Invoked when the operation is `start()`ed.
+    virtual void started() = 0;
 
     /// Returns the comms passed to `start()`.
     inline QSharedPointer<Comms> &comms()

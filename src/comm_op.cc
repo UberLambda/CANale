@@ -25,12 +25,6 @@ void Operation::start(QSharedPointer<Comms> comms)
     started();
 }
 
-void Operation::progress(QString message, int progress)
-{
-    m_onProgress(message, progress);
-}
-
-
 StartDevicesOp::StartDevicesOp(ProgressHandler onProgress,
                                QList<CAdevId> devices, QObject *parent)
     : Operation(onProgress, parent), m_devices(devices)
@@ -40,7 +34,7 @@ StartDevicesOp::StartDevicesOp(ProgressHandler onProgress,
 void StartDevicesOp::started()
 {
     // FIXME IMPLEMENT!
-    progress(QStringLiteral("TODO"), -1);
+    onProgress()(QStringLiteral("TODO"), -1);
 }
 
 
@@ -53,7 +47,7 @@ StopDevicesOp::StopDevicesOp(ProgressHandler onProgress,
 void StopDevicesOp::started()
 {
     // FIXME IMPLEMENT!
-    progress(QStringLiteral("TODO"), -1);
+    onProgress()(QStringLiteral("TODO"), -1);
 }
 
 
@@ -66,7 +60,7 @@ FlashElfOp::FlashElfOp(ProgressHandler onProgress,
 void FlashElfOp::started()
 {
     // FIXME IMPLEMENT!
-    progress(QStringLiteral("TODO"), -1);
+    onProgress()(QStringLiteral("TODO"), -1);
 }
 
 }
