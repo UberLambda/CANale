@@ -28,22 +28,6 @@ void Operation::start(QSharedPointer<Comms> comms)
 void Operation::progress(QString message, int progress)
 {
     m_onProgress(message, progress);
-
-    if(progress >= 100)
-    {
-        // Operation done
-        emit done(message, true);
-    }
-    if(progress < 0)
-    {
-        // Operation failed
-        emit done(message, false);
-    }
-    else
-    {
-        // Progress made
-        emit progressed(message, unsigned(progress));
-    }
 }
 
 

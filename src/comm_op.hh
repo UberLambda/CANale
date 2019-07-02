@@ -28,21 +28,30 @@ class Operation : public QObject
     Q_OBJECT
 
 public:
+    /// Initializes the operation given the progress handler it will invoke.
     Operation(ProgressHandler onProgress, QObject *parent=nullptr);
     virtual ~Operation();
 
 public slots:
+    /// Starts the operation. It will use `Comms` to communicate from/to devices.
     void start(QSharedPointer<Comms> comms);
 
-signals:
-    void progressed(QString message, unsigned progress);
-    void done(QString message, bool success);
-
 protected:
+    /// Invoked when the operation is `start()`ed.
     virtual void started() = 0;
 
+    /// Call this when some progress is made (progress=0..100) or if the operation is
+    /// aborted (set progress to a negative value).
+    /// Also invokes the internal progress handler.
     void progress(QString message, int progress);
 
+    /// Returns the progress handler passed to the constructor.
+    inline ProgressHandler &onProgress()
+    {
+        return m_onProgress;
+    }
+
+    /// Returns the comms passed to `start()`.
     inline QSharedPointer<Comms> &comms()
     {
         return m_comms;
