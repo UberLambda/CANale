@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <istream>
 #include <streambuf>
+#include <QString>
 
 namespace ca
 {
@@ -126,6 +127,14 @@ public:
     {
     }
 };
+
+/// Formats a hexadecimal number ("0xNNNN").
+template <typename Num>
+inline QString hexStr(Num num, int nDigits=0)
+{
+    return QStringLiteral("0x")
+            + QStringLiteral("%1").arg(num, nDigits, 16, QChar('0')).toUpper();
+}
 
 }
 

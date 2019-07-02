@@ -7,6 +7,9 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #include "comm_op.hh"
 
+#include "util.hh"
+#include "comms.hh"
+
 namespace ca
 {
 
@@ -26,28 +29,100 @@ void Operation::start(QSharedPointer<Comms> comms)
 }
 
 StartDevicesOp::StartDevicesOp(ProgressHandler onProgress,
-                               QList<CAdevId> devices, QObject *parent)
-    : Operation(onProgress, parent), m_devices(devices)
+                               QSet<CAdevId> devices, QObject *parent)
+    : Operation(onProgress, parent),
+      m_devices(devices), m_nDevices(devices.size())
 {
 }
 
 void StartDevicesOp::started()
 {
-    // FIXME IMPLEMENT!
-    onProgress()(QStringLiteral("TODO"), -1);
+    if(m_nDevices == 0)
+    {
+        onProgress()(QStringLiteral("No devices to unlock"), 100);
+        return;
+    }
+
+    // Listen for when a device gets started
+    connect(comms().get(), &ca::Comms::progStarted, this, &StartDevicesOp::started);
+
+    // Send start command to all devices
+    for(CAdevId devId : m_devices)
+    {
+        comms()->progStart(devId);
+    }
+}
+
+void StartDevicesOp::onProgStarted(CAdevId devId)
+{
+    if(!m_devices.remove(devId))
+    {
+        // Not one of our devices
+        return;
+    }
+
+    if(!m_devices.empty())
+    {
+        int progress = static_cast<int>(0.01f * (m_nDevices - m_devices.size()) / m_nDevices);
+        onProgress()(QStringLiteral("Unlocked device %1 (%1 of %2)")
+                     .arg(hexStr(devId, sizeof(CAdevId) * 2)).arg(m_devices.size()).arg(m_nDevices),
+                     progress);
+    }
+    else
+    {
+        // Done!
+        onProgress()(QStringLiteral("Unlocked %1 devices").arg(m_devices.size()).arg(m_nDevices),
+                     100);
+    }
 }
 
 
 StopDevicesOp::StopDevicesOp(ProgressHandler onProgress,
-                               QList<CAdevId> devices, QObject *parent)
-    : Operation(onProgress, parent), m_devices(devices)
+                             QSet<CAdevId> devices, QObject *parent)
+    : Operation(onProgress, parent),
+      m_devices(devices), m_nDevices(devices.size())
 {
 }
 
 void StopDevicesOp::started()
 {
-    // FIXME IMPLEMENT!
-    onProgress()(QStringLiteral("TODO"), -1);
+    if(m_nDevices == 0)
+    {
+        onProgress()(QStringLiteral("No devices to lock"), 100);
+        return;
+    }
+
+    // Listen for when a device gets stopped
+    connect(comms().get(), &ca::Comms::progEnd, this, &StopDevicesOp::onProgEnd);
+
+    // Send stop command to all devices
+    for(CAdevId devId : m_devices)
+    {
+        comms()->progEnd(devId);
+    }
+}
+
+void StopDevicesOp::onProgEnd(CAdevId devId)
+{
+    if(!m_devices.remove(devId))
+    {
+        // Not one of our devices
+        return;
+    }
+
+    if(!m_devices.empty())
+    {
+        int progress = static_cast<int>(0.01f * (m_nDevices - m_devices.size()) / m_nDevices);
+        onProgress()(QStringLiteral("Locked device %1 (%1 of %2)")
+                     .arg(hexStr(devId, sizeof(CAdevId) * 2)).arg(m_devices.size()).arg(m_nDevices),
+                     progress);
+    }
+    else
+    {
+        // Done!
+        onProgress()(QStringLiteral("Locked %1 devices").arg(m_devices.size()).arg(m_nDevices),
+                     100);
+    }
 }
 
 

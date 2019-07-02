@@ -97,13 +97,6 @@ bool CAinst::init(QSharedPointer<QCanBusDevice> can)
     return true;
 }
 
-template <typename Num>
-inline static QString hexStr(Num num, int nDigits=0)
-{
-    return QStringLiteral("0x")
-            + QStringLiteral("%1").arg(num, nDigits, 16, QChar('0')).toUpper();
-}
-
 unsigned CAinst::listSegmentsToFlash(const ELFIO::elfio &elf, std::vector<ELFIO::segment *> &outSegments)
 {
     emit logged(CA_DEBUG,
@@ -196,15 +189,15 @@ void caStartDevices(CAinst *ca, unsigned long nDevIds, const CAdevId devIds[],
 {
     EXPECT_C(ca && (devIds || nDevIds == 0), "Invalid arguments");
 
-    QList<CAdevId> devIdsList;
-    devIdsList.reserve(static_cast<int>(nDevIds));
+    QSet<CAdevId> devIdsSet;
+    devIdsSet.reserve(static_cast<int>(nDevIds));
     for(auto *it = devIds; it != (devIds + nDevIds); it ++)
     {
-        devIdsList.push_back(*it);
+        devIdsSet.insert(*it);
     }
 
     ca->addOperation(new ca::StartDevicesOp(
-        ca::ProgressHandler{onProgress, onProgressUserData}, devIdsList));
+        ca::ProgressHandler{onProgress, onProgressUserData}, devIdsSet));
 }
 
 void caStopDevices(CAinst *ca, unsigned long nDevIds, const CAdevId devIds[],
@@ -212,15 +205,15 @@ void caStopDevices(CAinst *ca, unsigned long nDevIds, const CAdevId devIds[],
 {
     EXPECT_C(ca && (devIds || nDevIds == 0), "Invalid arguments");
 
-    QList<CAdevId> devIdsList;
-    devIdsList.reserve(static_cast<int>(nDevIds));
+    QSet<CAdevId> devIdsSet;
+    devIdsSet.reserve(static_cast<int>(nDevIds));
     for(auto *it = devIds; it != (devIds + nDevIds); it ++)
     {
-        devIdsList.push_back(*it);
+        devIdsSet.insert(*it);
     }
 
     ca->addOperation(new ca::StopDevicesOp(
-        ca::ProgressHandler{onProgress, onProgressUserData}, devIdsList));
+        ca::ProgressHandler{onProgress, onProgressUserData}, devIdsSet));
 }
 
 void caFlashELF(CAinst *ca, CAdevId devId,

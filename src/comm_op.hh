@@ -11,7 +11,7 @@
 #include <functional>
 #include <QObject>
 #include <QString>
-#include <QList>
+#include <QSet>
 #include <QByteArray>
 #include <QSharedPointer>
 #include "types.hh"
@@ -63,14 +63,18 @@ class StartDevicesOp : public Operation
 {
 public:
     StartDevicesOp(ProgressHandler onProgress,
-                   QList<CAdevId> devices,
+                   QSet<CAdevId> devices,
                    QObject *parent=nullptr);
     ~StartDevicesOp() override = default;
 
 private:
-    QList<CAdevId> m_devices;
+    QSet<CAdevId> m_devices;
+    int m_nDevices;
 
     void started() override;
+
+private slots:
+    void onProgStarted(CAdevId devId);
 };
 
 /// An `Operation` that sends PROG_DONE commands to a list of devices (and
@@ -79,14 +83,18 @@ class StopDevicesOp : public Operation
 {
 public:
     StopDevicesOp(ProgressHandler onProgress,
-                  QList<CAdevId> devices,
+                  QSet<CAdevId> devices,
                   QObject *parent=nullptr);
     ~StopDevicesOp() override = default;
 
 private:
-    QList<CAdevId> m_devices;
+    QSet<CAdevId> m_devices;
+    int m_nDevices;
 
     void started() override;
+
+private slots:
+    void onProgStopped(CAdevId devId);
 };
 
 /// An `Operation` that flashes an ELF file to a target.
