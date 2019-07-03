@@ -117,7 +117,7 @@ unsigned CAinst::listSegmentsToFlash(const ELFIO::elfio &elf, std::vector<ELFIO:
                 segmMsg += QStringLiteral("loadable, flash fileSize=%1B (out of memSize=%2B) at physAddr=%3")
                             .arg(segm->get_file_size())
                             .arg(segm->get_memory_size())
-                            .arg(hexStr(segm->get_physical_address(), 8));
+                            .arg(ca::hexStr(segm->get_physical_address(), 8));
 
                 outSegments.push_back(segm);
                 nOutput ++;

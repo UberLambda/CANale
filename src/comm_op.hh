@@ -61,6 +61,8 @@ private:
 /// (and waits for their response).
 class StartDevicesOp : public Operation
 {
+    Q_OBJECT
+
 public:
     StartDevicesOp(ProgressHandler onProgress,
                    QSet<CAdevId> devices,
@@ -81,6 +83,8 @@ private slots:
 /// waits for their response).
 class StopDevicesOp : public Operation
 {
+    Q_OBJECT
+
 public:
     StopDevicesOp(ProgressHandler onProgress,
                   QSet<CAdevId> devices,
@@ -94,12 +98,14 @@ private:
     void started() override;
 
 private slots:
-    void onProgStopped(CAdevId devId);
+    void onProgEnd(CAdevId devId);
 };
 
 /// An `Operation` that flashes an ELF file to a target.
 class FlashElfOp : public Operation
 {
+    Q_OBJECT
+
 public:
     FlashElfOp(ProgressHandler onProgress,
                CAdevId devId, QByteArray elfData,
