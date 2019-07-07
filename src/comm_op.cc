@@ -73,7 +73,7 @@ void StartDevicesOp::onProgStarted(CAdevId devId)
 
     if(!m_devices.empty())
     {
-        int progr = static_cast<int>(0.01f * (m_nDevices - m_devices.size()) / m_nDevices);
+        int progr = std::min(static_cast<int>(0.01f * (m_nDevices - m_devices.size()) / m_nDevices), 99);
         progress(QStringLiteral("Unlocked device %1 (%1 of %2)")
                  .arg(devIdStr(devId)).arg(m_devices.size()).arg(m_nDevices),
                  progr);
@@ -122,7 +122,7 @@ void StopDevicesOp::onProgEnd(CAdevId devId)
 
     if(!m_devices.empty())
     {
-        int progr = static_cast<int>(0.01f * (m_nDevices - m_devices.size()) / m_nDevices);
+        int progr = std::min(static_cast<int>(0.01f * (m_nDevices - m_devices.size()) / m_nDevices), 99);
         progress(QStringLiteral("Locked device %1 (%1 of %2)")
                  .arg(devIdStr(devId)).arg(m_devices.size()).arg(m_nDevices),
                  progr);
@@ -153,9 +153,6 @@ void FlashElfOp::started()
         return;
     }
 
-    static LogHandler nullLogger = {}; // Used if no `m_logger` present
-    LogHandler &log = logger() ? *logger() : nullLogger;
-
 
     // [0..4%]: Load ELF
     progress(QStringLiteral("Loading ELF for %1").arg(devIdS), 0);
@@ -170,7 +167,7 @@ void FlashElfOp::started()
     }
     progress(QStringLiteral("ELF loaded for %1").arg(devIdS), 4);
 
-    elfInfo(*m_elf, log);
+    elfInfo(*m_elf, loggerSafe());
 
     // [5..9%]: Send PROG_REQ and UNLOCK
     progress(QStringLiteral("Unlocking %1 to flash ELF").arg(devIdS), 5);
@@ -196,7 +193,7 @@ void FlashElfOp::onProgStarted(CAdevId devId, DeviceStats devStats)
     // [9%]: PROG_REQ and UNLOCK done
     progress(QStringLiteral("%1 unlocked").arg(devIdS), 9);
 
-    // [10..15%]: Check device stats, build flash map
+    // [10..14%]: Check device stats, list segments, build flash map
     progress(QStringLiteral("Checking if %1 is compatibile with ELF").arg(devIdS), 10);
     if(devStats.elfMachine != m_elf->get_machine())
     {
@@ -207,22 +204,89 @@ void FlashElfOp::onProgStarted(CAdevId devId, DeviceStats devStats)
         return;
     }
 
-    progress(QStringLiteral("Building ELF flash map for %1").arg(devIdS), 11);
+    progress(QStringLiteral("Listing ELF segments to flash to %1").arg(devIdS), 11);
+    ElfioSegments segments;
+    listElfSegmentsToFlash(*m_elf, segments, loggerSafe());
 
-    // FIXME IMPLEMENT: Build flash map
+    progress(QStringLiteral("Building ELF flash map for %1").arg(devIdS), 12);
+    m_flashMap = FlashMap(segments, devStats.pageSize);
 
-    // FIXME IMPLEMENT: Send page flash commands for pages in flash map
+    progress(QStringLiteral("ELF flash map for %1 built").arg(devIdS), 13);
+    log(CA_DEBUG,
+        QStringLiteral("%1: %3 pages of size %2B to be flashed")
+        .arg(devIdS).arg(devStats.pageSize).arg(m_flashMap.numPages()));
+
+    if(m_flashMap.pages().size() == 0)
+    {
+        progress(QStringLiteral("Nothing to flash to %1; ELF flash map is empty").arg(devIdS),
+                 100);
+        return;
+    }
+
+    // [15..100%]: Send page flash commands for pages in flash map
+    progress(QStringLiteral("Flashing pages to %1").arg(devIdS), 15);
+
+    auto firstPage = m_flashMap.pages().begin();
     connect(comms().get(), &Comms::pageFlashed, this, &FlashElfOp::onPageFlashed);
     connect(comms().get(), &Comms::pageFlashErrored, this, &FlashElfOp::onPageFlashErrored);
+    comms()->flashPage(devId, firstPage->first, firstPage->second);
+
+    // Asked to flash the first page; wait for `onPageFlashed()` or `onPageFlashErrored()`
 }
 
 void FlashElfOp::onPageFlashed(CAdevId devId, uint32_t pageAddr)
 {
-    // FIXME IMPLEMENT: Send page flash commands for pages in flash map
+    if(devId != m_devId)
+    {
+        // Not the device we are flashing
+        return;
+    }
+    QString devIdS = devIdStr(m_devId);
+
+    // [15..100%]: Page flashing
+    m_flashMap.pages().erase(pageAddr);
+
+    if(m_flashMap.pages().empty())
+    {
+        progress(QStringLiteral("Done flashing %1").arg(devIdS), 100);
+        return;
+    }
+
+    size_t nPagesFlashed = m_flashMap.numPages() - m_flashMap.pages().size();
+    int progr = std::min(static_cast<int>(0.01f * nPagesFlashed / m_flashMap.numPages()), 99);
+    progress(QStringLiteral("Flashed %2 of %3 to %1")
+             .arg(devIdS).arg(nPagesFlashed).arg(m_flashMap.numPages()), progr);
+
+    auto nextPage = m_flashMap.pages().begin();
+    comms()->flashPage(devId, nextPage->first, nextPage->second);
+
+    // Asked to flash the next page; wait for `onPageFlashed()` or `onPageFlashErrored()`
 }
 
 void FlashElfOp::onPageFlashErrored(CAdevId devId, uint32_t pageAddr, uint16_t expectedCrc, uint16_t recvdCrc)
 {
+    if(devId != m_devId)
+    {
+        // Not the device we are flashing
+        return;
+    }
+
+    auto failedPage = m_flashMap.pages().find(pageAddr);
+    if(failedPage == m_flashMap.pages().end())
+    {
+        log(CA_WARNING,
+            QStringLiteral("%1: page at %2 failed to flash, but wasn't supposed to be flashed anyways")
+            .arg(devIdStr(m_devId)).arg(hexStr(pageAddr, sizeof(pageAddr) * 2)));
+        return;
+    }
+
+    log(CA_WARNING,
+        QStringLiteral("%1: flashing failed for page at %2 (expected CRC: %3, received: %4)")
+        .arg(devIdStr(m_devId)).arg(hexStr(pageAddr, sizeof(pageAddr) * 2))
+        .arg(hexStr(expectedCrc)).arg(hexStr(recvdCrc)));
+
+    // Retry flashing the page (potentially forever!)
+    comms()->flashPage(m_devId, failedPage->first, failedPage->second);
 }
 
 }

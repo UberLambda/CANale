@@ -70,4 +70,48 @@ unsigned listElfSegmentsToFlash(const ELFIO::elfio &elf, std::vector<ELFIO::segm
     return nOutput;
 }
 
+FlashMap::FlashMap()
+    : m_pageSize(0), m_numPages(0), m_pages{}
+{
+}
+
+FlashMap::FlashMap(const ElfioSegments &segments, size_t pageSize)
+    : m_pageSize(pageSize)
+{
+    Q_ASSERT(pageSize != 0);
+
+    for(ELFIO::segment *segm : segments)
+    {
+        Q_ASSERT((segm->get_type() & PT_LOAD) && "Segment not loadable");
+
+        // All data for the segment that comes from the ELF file is to be flashed
+        auto startAddr = static_cast<PageAddr>(segm->get_physical_address());
+        auto nSegmPages = static_cast<size_t>(segm->get_file_size() / pageSize); // (truncated)
+
+        // Reference (do not copy) the data in the ELF segment for all entire pages we can read from it
+        size_t segmOffset = 0;
+        for(size_t i = 0; i < nSegmPages; i ++)
+        {
+            PageAddr pageAddr = startAddr + static_cast<PageAddr>(segmOffset);
+            m_pages[pageAddr] = QByteArray::fromRawData(segm->get_data() + segmOffset,
+                                                        static_cast<int>(pageSize));
+            segmOffset += pageSize;
+        }
+
+        // If any data is left over, copy it to a new page and zero-fill the remaining bytes
+        size_t left = segm->get_file_size() - segmOffset;
+        if(left > 0)
+        {
+            PageAddr pageAddr = startAddr + static_cast<PageAddr>(segmOffset);
+            auto &page = m_pages[pageAddr];
+            page = QByteArray(segm->get_data() + segmOffset, static_cast<int>(left));
+            page.append(static_cast<int>(pageSize - left), 0);
+        }
+    }
+
+    m_numPages = m_pages.size();
+}
+
+FlashMap::~FlashMap() = default;
+
 }

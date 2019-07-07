@@ -17,6 +17,7 @@
 #include <QSharedPointer>
 #include <elfio/elfio.hpp>
 #include "types.hh"
+#include "elf.hh"
 
 
 namespace ca
@@ -62,6 +63,13 @@ protected:
     inline ca::LogHandler *logger()
     {
         return m_logger;
+    }
+
+    /// Returns `logger()` if present or a no-op logger if it is not.
+    inline ca::LogHandler &loggerSafe()
+    {
+        static LogHandler nullLogger = {};
+        return m_logger ? *m_logger : nullLogger;
     }
 
     /// Calls `onProgress(message, progress)`. If `doLog` is `true` also logs the
@@ -147,7 +155,10 @@ private slots:
     void onProgEnd(CAdevId devId);
 };
 
-/// An `Operation` that flashes an ELF file to a target.
+/// An `Operation` that unlocks a target and flashes an ELF file to it.
+///
+/// Retries flashing a page until it succeeds (CRC matching); potentially
+/// retries forever!
 class FlashElfOp : public Operation
 {
     Q_OBJECT
@@ -162,6 +173,7 @@ private:
     CAdevId m_devId;
     QByteArray m_elfData;
     std::unique_ptr<ELFIO::elfio> m_elf;
+    FlashMap m_flashMap;
 
     void started() override;
 
