@@ -11,7 +11,6 @@
 #include "canale.h"
 
 #include <memory>
-#include <vector>
 #include <deque>
 #include <QObject>
 #include <QSharedPointer>
@@ -20,6 +19,7 @@
 #include <QList>
 #include <elfio/elfio.hpp>
 #include "comms.hh"
+#include "types.hh"
 #include "comm_op.hh"
 
 namespace ca
@@ -30,10 +30,11 @@ namespace ca
 struct CAinst : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(CAlogHandler logHandler MEMBER logHandler)
+    Q_PROPERTY(ca::LogHandler logHandler MEMBER logHandler)
 
 public:
-    CAlogHandler logHandler;
+    /// The log handler associated to this CAinst.
+    ca::LogHandler logHandler;
 
     CAinst(QObject *parent=nullptr);
     ~CAinst();
@@ -49,11 +50,6 @@ public:
     {
         return m_comms;
     }
-
-signals:
-    /// Emitted when a new message is to be logged.
-    /// Called whenever `logHandler` is to be called.
-    void logged(CAlogLevel level, QString message);
 
 public slots:
     /// Initializes this CANale instance given its init configuration.
@@ -80,15 +76,6 @@ private:
     QSharedPointer<ca::Comms> m_comms; ///< The CANnuccia protocol interface.
 
     std::deque<std::unique_ptr<ca::Operation>> m_operations; ///< All currently-ongoing operations.
-
-    /// Appends the list of segments in `elf` that will have to be flashed.
-    /// Also logs some diagnostic output about `elf`.
-    /// Returns the number of segments appended to `outSegments`.
-    ///
-    /// Segments to be flashed have the PT_LOAD type and a `fileSize` greater
-    /// than zero; they will correspond to `fileSize` bytes to be written at
-    /// `physAddr` in the target device's flash.
-    unsigned listSegmentsToFlash(const ELFIO::elfio &elf, std::vector<ELFIO::segment *> &outSegments);
 };
 
 #endif // CANALE_HH
