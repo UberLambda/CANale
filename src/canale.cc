@@ -94,15 +94,21 @@ void CAinst::addOperation(ca::Operation *operation)
     m_operations.emplace_back(operation);
     ca::Operation *op = m_operations.back().get();
 
-    // When the operation is done remove it from the queue and start the next one if any
+    // When the operation is done remove it from the queue and start the first
+    // enqueued operation that is still to be started, if any
     connect(&op->onProgress(), &ca::ProgressHandler::done, [op, this]()
     {
         std::remove_if(m_operations.begin(), m_operations.end(),
                        [op](auto &opPtr) { return opPtr.get() == op; });
 
-        if(!m_operations.empty())
+        for(auto it = m_operations.begin(); it != m_operations.end(); it ++)
         {
-            m_operations.front()->start(m_comms, &m_logHandler);
+            ca::Operation &nextOp = *it->get();
+            if(!nextOp.isStarted())
+            {
+                nextOp.start(m_comms, &m_logHandler);
+                break;
+            }
         }
     });
 

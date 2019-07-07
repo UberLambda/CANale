@@ -23,7 +23,7 @@ inline QString devIdStr(CAdevId devId)
 
 
 Operation::Operation(ProgressHandler onProgress, QObject *parent)
-    : QObject(parent), m_onProgress(std::move(onProgress))
+    : QObject(parent), m_onProgress(std::move(onProgress)), m_started(false)
 {
 }
 
@@ -35,6 +35,7 @@ void Operation::start(QSharedPointer<Comms> comms, LogHandler *logger)
 {
     m_comms = comms;
     m_logger = logger;
+    m_started = true;
     started();
 }
 

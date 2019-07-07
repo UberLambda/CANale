@@ -43,6 +43,12 @@ public:
         return m_onProgress;
     }
 
+    /// Returns whether the operation was `start()`ed or not.
+    inline bool isStarted() const
+    {
+        return m_started;
+    }
+
 public slots:
     /// Starts the operation.
     /// It will use `Comms` to communicate from/to devices and `logger` (if any)
@@ -107,6 +113,7 @@ protected:
 
 private:
     ProgressHandler m_onProgress;
+    bool m_started;
     QSharedPointer<Comms> m_comms;
     ca::LogHandler *m_logger;
 };
