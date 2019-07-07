@@ -1,4 +1,4 @@
-# CANnale/CMakeLists.txt
+# CANale/CMakeLists.txt
 #
 # Copyright (c) 2019, Paolo Jovon <paolo.jovon@gmail.com>
 #
