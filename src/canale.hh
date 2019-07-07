@@ -74,7 +74,7 @@ public slots:
     /// Enqueues an operation to be performed on this `CAinst`.
     /// The `CAinst` will take ownership of the pointer.
     ///
-    /// It will be started as soon as possible; check the operation's progress
+    /// Operations are started in FIFO order; check the operation's progress
     /// handler for its status.
     void addOperation(ca::Operation *operation);
 

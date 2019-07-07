@@ -94,14 +94,23 @@ void CAinst::addOperation(ca::Operation *operation)
     m_operations.emplace_back(operation);
     ca::Operation *op = m_operations.back().get();
 
-    // Remove the task from the queue as soon as it is done
+    // When the operation is done remove it from the queue and start the next one if any
     connect(&op->onProgress(), &ca::ProgressHandler::done, [op, this]()
     {
         std::remove_if(m_operations.begin(), m_operations.end(),
                        [op](auto &opPtr) { return opPtr.get() == op; });
+
+        if(!m_operations.empty())
+        {
+            m_operations.front()->start(m_comms, &m_logHandler);
+        }
     });
 
-    op->start(m_comms, &m_logHandler);
+    // Start this operation if it's the first one
+    if(m_operations.size() == 1)
+    {
+        op->start(m_comms, &m_logHandler);
+    }
 }
 
 // ---- C API to implement for include/canale.h --------------------------------
