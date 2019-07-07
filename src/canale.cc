@@ -18,8 +18,7 @@
 
 CAinst::CAinst(QObject *parent)
     : QObject(parent),
-      logHandler(nullptr), m_can(nullptr),
-      m_canConnected(false), m_comms(new ca::Comms(this))
+      m_logHandler(nullptr), m_can(nullptr), m_canConnected(false), m_comms(new ca::Comms(this))
 {
 }
 
@@ -29,38 +28,38 @@ CAinst::~CAinst()
     {
         m_can->disconnectDevice();
     }
-    logHandler(CA_INFO, "CANale halt");
+    m_logHandler(CA_INFO, "CANale halt");
 }
 
 bool CAinst::init(const CAconfig &config)
 {
-    logHandler = {config.logHandler};
+    m_logHandler = {config.logHandler};
 
-    logHandler(CA_INFO, "CANale init");
+    m_logHandler(CA_INFO, "CANale init");
 
     if(!config.canInterface || config.canInterface[0] == '\0')
     {
-        logHandler(CA_ERROR, "No CAN interface specified");
+        m_logHandler(CA_ERROR, "No CAN interface specified");
         return false;
     }
 
     QStringList canToks = QString(config.canInterface).split('|');
     if(canToks.length() != 2)
     {
-        logHandler(CA_ERROR,
-                   QStringLiteral("Invalid CAN interface \"%1\"").arg(config.canInterface));
+        m_logHandler(CA_ERROR,
+                     QStringLiteral("Invalid CAN interface \"%1\"").arg(config.canInterface));
         return false;
     }
 
-    logHandler(CA_INFO,
-               QStringLiteral("Creating CAN link on interface \"%1\"").arg(config.canInterface));
+    m_logHandler(CA_INFO,
+                 QStringLiteral("Creating CAN link on interface \"%1\"").arg(config.canInterface));
 
     QString err;
     QSharedPointer<QCanBusDevice> canDev(QCanBus::instance()->createDevice(canToks[0], canToks[1], &err));
     if(!canDev)
     {
-        logHandler(CA_ERROR,
-                   QStringLiteral("Failed to create CAN link: %1").arg(err));
+        m_logHandler(CA_ERROR,
+                     QStringLiteral("Failed to create CAN link: %1").arg(err));
         return false;
     }
 
@@ -71,20 +70,20 @@ bool CAinst::init(QSharedPointer<QCanBusDevice> can)
 {
     if(!can)
     {
-        logHandler(CA_ERROR, "CAN link not present");
+        m_logHandler(CA_ERROR, "CAN link not present");
         return false;
     }
 
-    logHandler(CA_INFO, "Connecting to CAN link...");
+    m_logHandler(CA_INFO, "Connecting to CAN link...");
     if(!can->connectDevice())
     {
-        logHandler(CA_ERROR,
-                   QStringLiteral("Failed to connect to CAN link. Error [%1]: %2")
-                   .arg(can->error()).arg(can->errorString()));
+        m_logHandler(CA_ERROR,
+                     QStringLiteral("Failed to connect to CAN link. Error [%1]: %2")
+                     .arg(can->error()).arg(can->errorString()));
         return false;
     }
 
-    logHandler(CA_INFO, "CAN link estabilished");
+    m_logHandler(CA_INFO, "CAN link estabilished");
     m_can = can;
     m_comms->setCan(m_can);
     return true;
@@ -108,7 +107,7 @@ void CAinst::addOperation(ca::Operation *operation)
 // ---- C API to implement for include/canale.h --------------------------------
 
 #define EXPECT_C(expr, message) do { Q_ASSERT(expr); \
-    if(ca) { ca->logHandler(CA_ERROR, message); } \
+    if(ca) { ca->logHandler()(CA_ERROR, message); } \
     if(onProgress) { onProgress(message, -1, onProgressUserData); } \
     return; \
     } while(0)

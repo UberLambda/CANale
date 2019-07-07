@@ -30,12 +30,9 @@ namespace ca
 struct CAinst : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(ca::LogHandler logHandler MEMBER logHandler)
+    Q_PROPERTY(ca::LogHandler logHandler READ logHandler WRITE setLogHandler)
 
 public:
-    /// The log handler associated to this CAinst.
-    ca::LogHandler logHandler;
-
     CAinst(QObject *parent=nullptr);
     ~CAinst();
 
@@ -49,6 +46,18 @@ public:
     inline QSharedPointer<ca::Comms> comms()
     {
         return m_comms;
+    }
+
+    /// Returns the log handler associated to this CAinst.
+    inline ca::LogHandler &logHandler()
+    {
+        return m_logHandler;
+    }
+
+    /// Sets the log handler associated to this CAinst.
+    inline void setLogHandler(ca::LogHandler logHandler)
+    {
+        m_logHandler = logHandler;
     }
 
 public slots:
@@ -71,9 +80,11 @@ public slots:
 
 
 private:
+    ca::LogHandler m_logHandler; ///< The log handler associated to this CAinst.
     QSharedPointer<QCanBusDevice> m_can; ///< The link to the CAN network.
     bool m_canConnected; ///< Did `m_can->connectDevice()` succeed?
     QSharedPointer<ca::Comms> m_comms; ///< The CANnuccia protocol interface.
+
 
     std::deque<std::unique_ptr<ca::Operation>> m_operations; ///< All currently-ongoing operations.
 };
