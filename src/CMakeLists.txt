@@ -22,6 +22,7 @@ add_library(canale SHARED
     comms.cc
     comm_op.cc
     types.cc
+    elf.cc
 )
 set_target_properties(canale PROPERTIES
     DEFINE_SYMBOL "CA_EXPORTS"
