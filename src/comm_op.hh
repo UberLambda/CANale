@@ -14,7 +14,9 @@
 #include <QSet>
 #include <QByteArray>
 #include <QSharedPointer>
+#include <elfio/elfio.hpp>
 #include "types.hh"
+
 
 namespace ca
 {
@@ -32,15 +34,17 @@ public:
     Operation(ProgressHandler onProgress, QObject *parent=nullptr);
     virtual ~Operation();
 
-public slots:
-    /// Starts the operation. It will use `Comms` to communicate from/to devices.
-    void start(QSharedPointer<Comms> comms);
-
     /// Returns the progress handler passed to the constructor.
     inline ProgressHandler &onProgress()
     {
         return m_onProgress;
     }
+
+public slots:
+    /// Starts the operation.
+    /// It will use `Comms` to communicate from/to devices and `logger` (if any)
+    /// to log information about the ongoing operation.
+    void start(QSharedPointer<Comms> comms, ca::LogHandler *logger);
 
 protected:
     /// Invoked when the operation is `start()`ed.
@@ -52,9 +56,31 @@ protected:
         return m_comms;
     }
 
+    /// Returns the log handler passed to `start()` (if any).
+    inline ca::LogHandler *logger()
+    {
+        return m_logger;
+    }
+
+    /// Convenience function to call `onProgress()`.
+    inline void progress(QString message, int progress)
+    {
+        m_onProgress(message, progress);
+    }
+
+    /// Convenience function to call `logger()` only if it is non-null.
+    inline void log(CAlogLevel level, QString message)
+    {
+        if(m_logger)
+        {
+            m_logger->call(level, message);
+        }
+    }
+
 private:
     ProgressHandler m_onProgress;
     QSharedPointer<Comms> m_comms;
+    ca::LogHandler *m_logger;
 };
 
 /// An `Operation` that sends PROG_REQ + UNLOCK commands to a list of devices
@@ -115,6 +141,7 @@ public:
 private:
     CAdevId m_devId;
     QByteArray m_elfData;
+    ELFIO::elfio m_elf;
 
     void started() override;
 };

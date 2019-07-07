@@ -101,7 +101,7 @@ void CAinst::addOperation(ca::Operation *operation)
                        [op](auto &opPtr) { return opPtr.get() == op; });
     });
 
-    op->start(m_comms);
+    op->start(m_comms, &m_logHandler);
 }
 
 // ---- C API to implement for include/canale.h --------------------------------

@@ -22,9 +22,10 @@ Operation::~Operation()
 {
 }
 
-void Operation::start(QSharedPointer<Comms> comms)
+void Operation::start(QSharedPointer<Comms> comms, LogHandler *logger)
 {
     m_comms = comms;
+    m_logger = logger;
     started();
 }
 
@@ -39,7 +40,7 @@ void StartDevicesOp::started()
 {
     if(m_nDevices == 0)
     {
-        onProgress()(QStringLiteral("No devices to unlock"), 100);
+        progress(QStringLiteral("No devices to unlock"), 100);
         return;
     }
 
@@ -63,16 +64,16 @@ void StartDevicesOp::onProgStarted(CAdevId devId)
 
     if(!m_devices.empty())
     {
-        int progress = static_cast<int>(0.01f * (m_nDevices - m_devices.size()) / m_nDevices);
-        onProgress()(QStringLiteral("Unlocked device %1 (%1 of %2)")
-                     .arg(hexStr(devId, sizeof(CAdevId) * 2)).arg(m_devices.size()).arg(m_nDevices),
-                     progress);
+        int progr = static_cast<int>(0.01f * (m_nDevices - m_devices.size()) / m_nDevices);
+        progress(QStringLiteral("Unlocked device %1 (%1 of %2)")
+                 .arg(hexStr(devId, sizeof(CAdevId) * 2)).arg(m_devices.size()).arg(m_nDevices),
+                 progr);
     }
     else
     {
         // Done!
-        onProgress()(QStringLiteral("Unlocked %1 devices").arg(m_devices.size()).arg(m_nDevices),
-                     100);
+        progress(QStringLiteral("Unlocked %1 devices").arg(m_devices.size()).arg(m_nDevices),
+                 100);
     }
 }
 
@@ -88,7 +89,7 @@ void StopDevicesOp::started()
 {
     if(m_nDevices == 0)
     {
-        onProgress()(QStringLiteral("No devices to lock"), 100);
+        progress(QStringLiteral("No devices to lock"), 100);
         return;
     }
 
@@ -112,30 +113,31 @@ void StopDevicesOp::onProgEnd(CAdevId devId)
 
     if(!m_devices.empty())
     {
-        int progress = static_cast<int>(0.01f * (m_nDevices - m_devices.size()) / m_nDevices);
-        onProgress()(QStringLiteral("Locked device %1 (%1 of %2)")
-                     .arg(hexStr(devId, sizeof(CAdevId) * 2)).arg(m_devices.size()).arg(m_nDevices),
-                     progress);
+        int progr = static_cast<int>(0.01f * (m_nDevices - m_devices.size()) / m_nDevices);
+        progress(QStringLiteral("Locked device %1 (%1 of %2)")
+                 .arg(hexStr(devId, sizeof(CAdevId) * 2)).arg(m_devices.size()).arg(m_nDevices),
+                 progr);
     }
     else
     {
         // Done!
-        onProgress()(QStringLiteral("Locked %1 devices").arg(m_devices.size()).arg(m_nDevices),
-                     100);
+        progress(QStringLiteral("Locked %1 devices").arg(m_devices.size()).arg(m_nDevices),
+                 100);
     }
 }
 
 
 FlashElfOp::FlashElfOp(ProgressHandler onProgress,
                        CAdevId devId, QByteArray elfData, QObject *parent)
-    : Operation(onProgress, parent)
+    : Operation(onProgress, parent),
+      m_devId(devId), m_elfData(elfData)
 {
 }
 
 void FlashElfOp::started()
 {
     // FIXME IMPLEMENT!
-    onProgress()(QStringLiteral("TODO"), -1);
+    progress(QStringLiteral("TODO"), -1);
 }
 
 }
