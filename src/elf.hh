@@ -9,7 +9,6 @@
 #define ELF_HH
 
 #include <elfio/elfio.hpp>
-#include <elfio/elf_types.hpp>
 #include "types.hh"
 
 namespace ca

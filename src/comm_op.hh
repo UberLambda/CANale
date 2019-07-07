@@ -9,6 +9,7 @@
 #define COMM_OP_HH
 
 #include <functional>
+#include <memory>
 #include <QObject>
 #include <QString>
 #include <QSet>
@@ -21,7 +22,8 @@
 namespace ca
 {
 
-class Comms; // comms.hh
+class Comms; // (#include "comms.hh")
+struct DeviceStats; // (#include "comms.hh")
 
 /// An operation involving `Comms`; it sends and receives messages/ACKs and keeps
 /// track of its own progress.
@@ -62,10 +64,28 @@ protected:
         return m_logger;
     }
 
-    /// Convenience function to call `onProgress()`.
-    inline void progress(QString message, int progress)
+    /// Calls `onProgress(message, progress)`. If `doLog` is `true` also logs the
+    /// progress message (as CA_INFO or CA_ERROR depending on if `progress` is
+    /// negative).
+    inline void progress(QString message, int progress, bool doLog=true)
     {
         m_onProgress(message, progress);
+        if(doLog)
+        {
+            CAlogLevel logLevel;
+            QString logMsg;
+            if(progress >= 0)
+            {
+                logLevel = CA_INFO;
+                logMsg = QStringLiteral("[%2%] %1").arg(message).arg(progress, 3);
+            }
+            else
+            {
+                logLevel = CA_ERROR;
+                logMsg = QStringLiteral("%1 [error %2]").arg(message).arg(-progress);
+            }
+            log(logLevel, logMsg);
+        }
     }
 
     /// Convenience function to call `logger()` only if it is non-null.
@@ -141,9 +161,14 @@ public:
 private:
     CAdevId m_devId;
     QByteArray m_elfData;
-    ELFIO::elfio m_elf;
+    std::unique_ptr<ELFIO::elfio> m_elf;
 
     void started() override;
+
+private slots:
+    void onProgStarted(CAdevId devId, DeviceStats devStats);
+    void onPageFlashed(CAdevId devId, uint32_t pageAddr);
+    void onPageFlashErrored(CAdevId devId, uint32_t pageAddr, uint16_t expectedCrc, uint16_t recvdCrc);
 };
 
 }

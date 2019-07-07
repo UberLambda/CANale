@@ -8,6 +8,7 @@
 #include "elf.hh"
 
 #include "util.hh"
+#include <elfio/elf_types.hpp>
 
 namespace ca
 {
@@ -16,8 +17,17 @@ void elfInfo(const ELFIO::elfio &elf, LogHandler &logger)
 {
     logger(CA_DEBUG,
            QStringLiteral("ELF machine type: %1").arg(elf.get_machine()));
-    logger(CA_DEBUG,
-           QStringLiteral("ELF OS ABI: %1 (version %2)").arg(elf.get_os_abi(), elf.get_abi_version()));
+
+    QString abiStr;
+    if(elf.get_os_abi() != ELFOSABI_NONE)
+    {
+        abiStr = QStringLiteral("%1 (version %2)").arg(elf.get_os_abi()).arg(elf.get_abi_version());
+    }
+    else
+    {
+        abiStr = QStringLiteral("none");
+    }
+    logger(CA_DEBUG, QStringLiteral("ELF OS ABI: %1").arg(abiStr));
 }
 
 unsigned listElfSegmentsToFlash(const ELFIO::elfio &elf, std::vector<ELFIO::segment *> &outSegments,
