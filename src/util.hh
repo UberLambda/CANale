@@ -12,6 +12,7 @@
 #include <istream>
 #include <streambuf>
 #include <QString>
+#include <QRegularExpression>
 
 namespace ca
 {
@@ -134,6 +135,38 @@ inline QString hexStr(Num num, int nDigits=0)
 {
     return QStringLiteral("0x")
             + QStringLiteral("%1").arg(num, nDigits, 16, QChar('0')).toUpper();
+}
+
+/// Reads a (signed) integer from a string. Supports hex (0x<n>), binary (0b<n>) and octal (0<n>).
+/// Returns true on success or false on parsing error.
+inline bool parseInt(const QString &str, long &outNum)
+{
+    QRegularExpression re("^("
+                          "(?<sign>[+-])?"
+                          "(0x(?<hexNum>[0-9A-Ea-e]+))"
+                          "|(0b(?<binNum>([01]+))"
+                          "|(0(?<octNum>([0-7]+))"
+                          "|(?<decNum>([0-9]+))"
+                          ")$");
+    auto match = re.match(str);
+
+    static const QMap<QString, int> baseMap{
+        {"hexNum", 16},
+        {"binNum", 2},
+        {"octNum", 8},
+        {"decNum", 10},
+    };
+    for(auto it = baseMap.begin(); it != baseMap.end(); it ++)
+    {
+        bool ok;
+        long num = match.captured(it.key()).toLong(&ok, it.value());
+        if(ok)
+        {
+            outNum = (match.captured("sign") == "-") ? -num : num;
+            return true;
+        }
+    }
+    return false;
 }
 
 }
