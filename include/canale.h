@@ -47,10 +47,12 @@ typedef void(*CAlogHandler)(CAlogLevel level, const char *message);
 /// Configuration flags for creating a CANale instance.
 typedef struct CAconfig
 {
-    /// The CAN interface to use to connect to the CANnuccia network, in the
-    /// format "<backend>|<interface>". <backend> is the name of the QtCanBus
-    /// plugin to use (ex. "socketcan"); <interface> is the CAN interface (ex.
-    /// "can0").
+    /// The CAN backend to use to connect to the CANnuccia network.
+    /// Should be the name of the QtCanBus plugin to use (ex. "socketcan").
+    const char *canBackend;
+
+    /// The CAN interface to use to connect to the CANnuccia network.
+    /// Should be the name of the interface/port to be used by QtCanBus (ex. "vcan0").
     const char *canInterface;
 
     /// Called when a message is logged by CANale.
