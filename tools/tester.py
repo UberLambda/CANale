@@ -17,8 +17,10 @@ import argparse
 import binascii
 import textwrap
 import logging as log
-from typing import Any
+from enum import IntEnum
+from typing import Any, Dict
 import can  # $ pip3 install python-can
+from crc16 import crc16xmodem  # $ pip3 install crc16
 
 
 log.basicConfig(level=log.INFO, stream=sys.stderr, format='[%(asctime)s] %(message)s')
@@ -66,20 +68,42 @@ def fmt_msg(msg: can.Message):
     return f'{eid_str} {data_str}'
 
 
-class TesterListener(can.Listener):
-    '''Simulates a CANnuccia device on a CAN bus'''
+class EmulatedDevice:
+    '''Holds the state of an emulated CANnuccia device.'''
 
-    def __init__(self, bus: can.Bus,
-        page_size: int = 1024, num_pages: int = 128, elf_machine: int = 83):
+    class State(IntEnum):
+        IDLE = 0
+        LOCKED = 1
+        UNLOCKED = 2
+        DONE = 3
 
-        self.bus = bus
-
+    def __init__(self, id: int, page_size: int = 1024, num_pages: int = 128, elf_machine: int = 83):
+        self.id = id
+        '''The if of the emulated device.'''
         self.page_size = page_size
-        '''The size in bytes of the flash pages in the simulated devices'''
+        '''The size in bytes of the flash pages in the device.'''
         self.num_pages = num_pages
-        '''The total number of pages of size `page_size` in the simulated devices'''
+        '''The total number of pages of size `page_size` in the device.'''
         self.elf_machine = elf_machine
-        '''The ELF machine type of the simulated devices'''
+        '''The ELF machine type of the device.'''
+
+        self.state = EmulatedDevice.State.IDLE
+        '''The current CANnuccia state of the device.'''
+        self.temp_page = bytearray(self.page_size)
+        '''The temporary flash page to which WRITE commands go to.'''
+        self.sel_page_addr = 0x00000000
+        '''The address of the selected page in flash.'''
+        self.write_offset = 0x00000000
+        '''The offset in bytes into the selected page in flash.'''
+
+class TesterListener(can.Listener):
+    '''Simulates a CANnuccia device on a CAN bus.'''
+
+    def __init__(self, bus: can.Bus, devices: Dict[int, EmulatedDevice] = {}):
+        self.bus = bus
+        '''The CAN bus to operate on.'''
+        self.devices = devices
+        '''Holds (device id -> emulated device) pairs. Note that key and value.id must match.'''
 
         # Bind all `self.handle_<message name>` methods to the respective CAN message being received
         self.msg_handlers = {}
@@ -99,7 +123,7 @@ class TesterListener(can.Listener):
         eid = (msg_type | dev_id_mask) >> 3
 
         msg = can.Message(arbitration_id=eid, is_extended_id=True, data=data)
-        log.info(f'> {fmt_msg(msg)}')
+        log.info(f'< {fmt_msg(msg)}')
         self.bus.send(msg)
 
     def on_error(self, exc: Exception):
@@ -112,10 +136,14 @@ class TesterListener(can.Listener):
 
         handler = self.msg_handlers.get(msg_type, None)
         if handler:
-            log.info(f'< {fmt_msg(msg)}')
-            handler(msg=msg, msg_type=msg_type, dev_id=dev_id)
+            log.info(f'> {fmt_msg(msg)}')
+            dev = self.devices.get(dev_id, None)
+            if dev:
+                handler(msg=msg, msg_type=msg_type, dev=dev)
+            else:
+                log.debug(f'No such device: 0x{dev_id:X}')
         else:
-            log.debug(f'Ignored: {str(msg)}')
+            log.debug(f'Unhandled message: {str(msg)}')
 
     def stop(self):
         log.info('TesterListener stopped')
@@ -123,81 +151,121 @@ class TesterListener(can.Listener):
 
     # ----- Add `handle_<messagename>()` methods below -----
 
-    def handle_prog_req(self, msg: can.Message, msg_type: int, dev_id: int):
-        log.info(f'PROG_REQ for 0x{dev_id:X}')
+    def handle_prog_req(self, msg: can.Message, msg_type: int, dev: EmulatedDevice):
+        if dev.state >= EmulatedDevice.State.DONE:
+            return
 
+        log.info(f'PROG_REQ for 0x{dev.id:X}')
+
+        # Always respond with a PROG_REQ_RESP, even if the state is already not IDLE
         # Payload of a PROG_REQ_RESP:
         data = struct.pack('<BHH',
-            self.page_size.bit_length() - 1,  # 1. log2(size of a flash page): U8
-            self.num_pages,                   # 2. Total number of flash pages: U16 LE
-            self.elf_machine,                 # 3. ELF machine type (e_machine): U16 LE
+            dev.page_size.bit_length() - 1,  # 1. log2(size of a flash page): U8
+            dev.num_pages,                   # 2. Total number of flash pages: U16 LE
+            dev.elf_machine,                 # 3. ELF machine type (e_machine): U16 LE
         )
-        self.send_msg(CAN.MSG_PROG_REQ_RESP, dev_id, data)
+        self.send_msg(CAN.MSG_PROG_REQ_RESP, dev.id, data)
 
-    def handle_prog_done(self, msg: can.Message, msg_type: int, dev_id: int):
-        log.info(f'DONE 0x{dev_id:X}')
+        if dev.state == EmulatedDevice.State.IDLE:
+            dev.state = EmulatedDevice.State.LOCKED
 
-        # FIXME: Set "done" flag for device
+    def handle_prog_done(self, msg: can.Message, msg_type: int, dev: EmulatedDevice):
+        if dev.state >= EmulatedDevice.State.DONE:
+            return
 
-        self.send_msg(CAN.MSG_PROG_DONE_ACK, dev_id)
+        log.info(f'DONE 0x{dev.id:X}')
 
-    def handle_unlock(self, msg: can.Message, msg_type: int, dev_id: int):
-        log.info(f'UNLOCK {dev_id:X}')
+        dev.state = EmulatedDevice.State.DONE
 
-        # FIXME: Set "unlocked" flag for device
+        self.send_msg(CAN.MSG_PROG_DONE_ACK, dev.id)
 
-        self.send_msg(CAN.MSG_UNLOCKED, dev_id)
+    def handle_unlock(self, msg: can.Message, msg_type: int, dev: EmulatedDevice):
+        if dev.state < EmulatedDevice.State.LOCKED or dev.state >= EmulatedDevice.State.DONE:
+            return
 
-    def handle_select_page(self, msg: can.Message, msg_type: int, dev_id: int):
+        log.info(f'UNLOCK {dev.id:X}')
+        if dev.state == EmulatedDevice.State.LOCKED:
+            dev.state = EmulatedDevice.State.UNLOCKED
+
+        self.send_msg(CAN.MSG_UNLOCKED, dev.id)
+
+    def handle_select_page(self, msg: can.Message, msg_type: int, dev: EmulatedDevice):
+        if dev.state != EmulatedDevice.State.UNLOCKED:
+            return
+
         # Payload of a SELECT_PAGE:
         # 1. Address of the first byte of the page: U32 LE
         page_addr = struct.unpack('< L', msg.data)[0]
 
-        log.info(f'SELECT_PAGE at 0x{page_addr:X} for 0x{dev_id:X}')
+        log.info(f'SELECT_PAGE at 0x{page_addr:X} for 0x{dev.id:X}')
 
-        # FIXME: Set addr of page selected for device
+        if page_addr >= (dev.num_pages * dev.page_size):
+            log.warning('Page out of bounds')
+            return
+
+        dev.sel_page_addr = page_addr
+        dev.write_offset = 0  # Write offset is reset when a new page is selected
 
         # Payload of a PAGE_SELECTED:
         # 1. Address of the first byte of the page: U32 LE
-        self.send_msg(CAN.MSG_PAGE_SELECTED, dev_id, msg.data)
+        self.send_msg(CAN.MSG_PAGE_SELECTED, dev.id, msg.data)
 
-    def handle_seek(self, msg: can.Message, msg_type: int, dev_id: int):
+    def handle_seek(self, msg: can.Message, msg_type: int, dev: EmulatedDevice):
+        if dev.state != EmulatedDevice.State.UNLOCKED:
+            return
+
         # Payload of a SEEK:
         # 1. Offset in bytes into the page: U32 LE
         offset = struct.unpack('< L', msg.data)[0]
 
-        # FIXME: Set page offset for device
+        # FIXME: Do bounds checking
+        dev.write_offset = offset
 
-    def handle_write(self, msg: can.Message, msg_type: int, dev_id: int):
+    def handle_write(self, msg: can.Message, msg_type: int, dev: EmulatedDevice):
+        if dev.state != EmulatedDevice.State.UNLOCKED:
+            return
+
         # Payload of a WRITE:
         # Bytes to write to the page: 1..8 U8
+        for i in range(len(msg.data)):
+            if dev.write_offset >= dev.page_size:
+                # Don't write beyond the page
+                break
 
-        # FIXME: Write data to temporary page
-        pass
+            dev.temp_page[dev.write_offset] = msg.data[i]
+            dev.write_offset += 1
 
-    def handle_check_writes(self, msg: can.Message, msg_type: int, dev_id: int):
-        log.info(f'CHECK_WRITES for 0x{dev_id:X}')
+        # TODO: Intentionally fail some writes according to a probability?
 
-        # FIXME: Calculate CRC of writes to temporary page
-        crc = 0xFEFE
+
+    def handle_check_writes(self, msg: can.Message, msg_type: int, dev: EmulatedDevice):
+        if dev.state != EmulatedDevice.State.UNLOCKED:
+            return
+
+        log.info(f'CHECK_WRITES for 0x{dev.id:X}')
+
+        # Calculate CRC of writes to temporary page
+        crc = crc16xmodem(bytes(dev.temp_page))
 
         # Payload of WRITES_CHECKED:
         data = struct.pack('< H',
             crc,  # 1. CRC16/xmodem of writes: U16 LE
         )
-        self.send_msg(CAN.MSG_WRITES_CHECKED, dev_id, data)
+        self.send_msg(CAN.MSG_WRITES_CHECKED, dev.id, data)
 
-    def handle_commit_writes(self, msg: can.Message, msg_type: int, dev_id: int):
-        log.info(f'COMMIT_WRITES for 0x{dev_id:X}')
+    def handle_commit_writes(self, msg: can.Message, msg_type: int, dev: EmulatedDevice):
+        if dev.state != EmulatedDevice.State.UNLOCKED:
+            return
 
-        # FIXME: Get the address of the page being written now
-        page_addr = 0xFEFEAABB
+        log.info(f'COMMIT_WRITES for 0x{dev.id:X}')
+
+        # TODO: Sleep for a bit to simulate a page being written?
 
         # Payload of WRITES_COMMITTED:
         data = struct.pack('< L',
-            page_addr,  # 1. Address of written-to page: U32 LE
+            dev.sel_page_addr,  # 1. Address of written-to page: U32 LE
         )
-        self.send_msg(CAN.MSG_WRITES_COMMITTED, dev_id, data)
+        self.send_msg(CAN.MSG_WRITES_COMMITTED, dev.id, data)
 
 
 def parse_args():
@@ -211,9 +279,14 @@ def parse_args():
 
 if __name__ == '__main__':
     args = parse_args()
-
     bus = can.Bus(interface=args.interface, channel=args.channel)
-    notifier = can.Notifier(bus, [TesterListener(bus)])
+
+    listener = TesterListener(bus, {
+        0xAA: EmulatedDevice(0xAA, 1024, 32, 83),  # 32kB flash AVR microcontroller (ex. ATMega328P)
+        0xBB: EmulatedDevice(0xBB, 1024, 64, 40),  # 64kB flash ARM microcontroller (ex. STM32 blue pill)
+    })
+
+    notifier = can.Notifier(bus, [listener])
     try:
         while True:
             time.sleep(1)
