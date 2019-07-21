@@ -39,23 +39,20 @@ bool CAinst::init(const CAconfig &config)
 
     if(!config.canInterface || config.canInterface[0] == '\0')
     {
-        m_logHandler(CA_ERROR, "No CAN interface specified");
+        m_logHandler(CA_ERROR, "No CAN interface or specified");
         return false;
     }
-
-    QStringList canToks = QString(config.canInterface).split('|');
-    if(canToks.length() != 2)
+    if(!config.canBackend || config.canBackend[0] == '\0')
     {
-        m_logHandler(CA_ERROR,
-                     QStringLiteral("Invalid CAN interface \"%1\"").arg(config.canInterface));
+        m_logHandler(CA_ERROR, "No CAN backend specified");
         return false;
     }
 
     m_logHandler(CA_INFO,
-                 QStringLiteral("Creating CAN link on interface \"%1\"").arg(config.canInterface));
+                 QStringLiteral("Creating CAN link on \"%1: %2\"").arg(config.canBackend).arg(config.canInterface));
 
     QString err;
-    QSharedPointer<QCanBusDevice> canDev(QCanBus::instance()->createDevice(canToks[0], canToks[1], &err));
+    QSharedPointer<QCanBusDevice> canDev(QCanBus::instance()->createDevice(config.canBackend, config.canInterface, &err));
     if(!canDev)
     {
         m_logHandler(CA_ERROR,
@@ -193,4 +190,13 @@ void caFlashELF(CAinst *ca, CAdevId devId,
 
     ca->addOperation(new ca::FlashElfOp(
                          ca::ProgressHandler{onProgress, onProgressUserData}, devId, elfDataArr));
+}
+
+unsigned caNumEnqueued(CAinst *ca)
+{
+    if(!ca)
+    {
+        return 0;
+    }
+    return static_cast<unsigned>(ca->numEnqueued());
 }
