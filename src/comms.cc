@@ -54,7 +54,7 @@ Comms::~Comms() = default;
 
 void Comms::sendSelectPageCmd(DevId devId, uint32_t pageAddr)
 {
-    quint32 msgId = translateEID(CN_CAN_MSG_PROG_DONE, devId);
+    quint32 msgId = translateEID(CN_CAN_MSG_SELECT_PAGE, devId);
     QByteArray payload(4, 0);
     writeU32LE(reinterpret_cast<uint8_t *>(payload.data()), pageAddr);
     m_can->writeFrame(QCanBusFrame(msgId, payload));

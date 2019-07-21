@@ -113,8 +113,8 @@ private:
 
         DeviceStats stats{0, 0, 0}; ///< Stats about this device
         std::unordered_map<uint32_t, QByteArray> pageFlashData{}; ///< page address -> data to flash there
-        uint32_t selPageAddr; ///< Currently-selected page (as indicated by PAGE_SELECTED)
-                              ///< or NO_PAGE if no page is being flashed currently
+        uint32_t selPageAddr{NO_PAGE}; ///< Currently-selected page (as indicated by PAGE_SELECTED)
+                                       ///< or NO_PAGE if no page is being flashed currently
     };
     std::unordered_map<DevId, DeviceState> m_deviceStates;
 
