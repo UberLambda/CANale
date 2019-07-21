@@ -60,6 +60,12 @@ public:
         m_logHandler = logHandler;
     }
 
+    /// Returns the number of operations enqueued into this CAinst.
+    inline size_t numEnqueued() const
+    {
+        return m_operations.size();
+    }
+
 public slots:
     /// Initializes this CANale instance given its init configuration.
     /// Returns true on success or false otherwise.

@@ -91,8 +91,6 @@ CA_API void caStartDevices(CAinst *ca, unsigned long nDevIds, const CAdevId devI
 CA_API void caStopDevices(CAinst *ca, unsigned long nDevIds, const CAdevId devIds[nDevIds],
                           CAprogressHandler onProgress, void *onProgressUserData);
 
-
-
 /// Flashes an ELF file (whose contents are in `elf`) to the device board with
 /// id `devId`.
 /// Calls the log handler and given progress handler (if any) as appropriate.
@@ -101,6 +99,11 @@ CA_API void caStopDevices(CAinst *ca, unsigned long nDevIds, const CAdevId devId
 CA_API void caFlashELF(CAinst *ca, CAdevId devId,
                        unsigned long elfLen, const char elf[elfLen],
                        CAprogressHandler onProgress, void *onProgressUserData);
+
+
+/// Returns the number of operations still enqueued into a CANale instance.
+CA_API unsigned caNumEnqueued(CAinst *ca);
+
 
 #ifndef __cplusplus
 }

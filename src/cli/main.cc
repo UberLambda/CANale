@@ -191,7 +191,7 @@ int main(int argc, char **argv)
     config.canInterface = interfaceStr.c_str();
     config.logHandler = [](CAlogLevel level, const char *msg)
     {
-        qDebug() << level << "-" << msg;
+        qWarning() << level << "-" << msg;
     };
 
     CAinst inst;
@@ -200,13 +200,31 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    auto onProgressFunc = [](const char *descr, int progress, void *userData)
+    if(argParser.positionalArguments().empty())
     {
-        qDebug() << descr << ": "
-                 << QString((progress >= 0) ? "%1%" : "failed (error %1)").arg(progress);
+        qWarning() << "Nothing to do";
+        return 0;
+    }
+
+    auto onProgressFunc = [&inst, &app](const char *descr, int progress, void *userData)
+    {
+        if(progress < 0)
+        {
+            qCritical() << descr << QStringLiteral(": failed (error %1)").arg(progress);
+        }
+
+        // TODO: Show ASCII art progress bar
+
+        if((progress < 0 || progress >= 100) && (inst.numEnqueued() == 0))
+        {
+            // Last operation, end the program
+            qWarning() << "All operations done";
+            app.quit();
+        }
     };
     ca::ProgressHandler onProgress(onProgressFunc);
 
+    // Parse all operations from command-line first
     QList<ca::Operation *> operations;
     for(const QString &opDescr : argParser.positionalArguments())
     {
@@ -215,14 +233,14 @@ int main(int argc, char **argv)
         {
             return 2;
         }
+        operations.push_back(op);
     }
 
-    QFile elfFile("/home/paolo/devel/CANnuccia/build/avr-release/cn.elf");
-    elfFile.open(QFile::ReadOnly);
-    QByteArray elfData = elfFile.readAll();
-    inst.addOperation(new ca::FlashElfOp(onProgress, 0xEF, elfData));
-
-    // FIXME Exit when all operations are done!
+    // Start them only if they could all be parsed
+    for(ca::Operation *op : operations)
+    {
+        inst.addOperation(op);
+    }
 
     return app.exec();
 }

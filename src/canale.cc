@@ -191,3 +191,12 @@ void caFlashELF(CAinst *ca, CAdevId devId,
     ca->addOperation(new ca::FlashElfOp(
                          ca::ProgressHandler{onProgress, onProgressUserData}, devId, elfDataArr));
 }
+
+unsigned caNumEnqueued(CAinst *ca)
+{
+    if(!ca)
+    {
+        return 0;
+    }
+    return static_cast<unsigned>(ca->numEnqueued());
+}
