@@ -215,7 +215,7 @@ int main(int argc, char **argv)
 
         // TODO: Show ASCII art progress bar
 
-        if((progress < 0 || progress >= 100) && (inst.numEnqueued() == 0))
+        if((progress < 0 || progress >= 100) && (inst.numEnqueued() <= 1))
         {
             // Last operation, end the program
             qWarning() << "All operations done";

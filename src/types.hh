@@ -116,7 +116,7 @@ public slots:
             // Operation done
             emit done(message, true);
         }
-        if(progress < 0)
+        else if(progress < 0)
         {
             // Operation failed
             emit done(message, false);

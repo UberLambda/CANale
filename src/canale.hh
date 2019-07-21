@@ -92,7 +92,7 @@ private:
     QSharedPointer<ca::Comms> m_comms; ///< The CANnuccia protocol interface.
 
 
-    std::deque<std::unique_ptr<ca::Operation>> m_operations; ///< All currently-ongoing operations.
+    std::deque<ca::Operation *> m_operations; ///< All currently-ongoing operations.
 };
 
 #endif // CANALE_HH

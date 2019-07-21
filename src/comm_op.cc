@@ -55,7 +55,7 @@ void StartDevicesOp::started()
     }
 
     // Listen for when a device gets started
-    connect(comms().get(), &ca::Comms::progStarted, this, &StartDevicesOp::started);
+    connect(comms().get(), &ca::Comms::progStarted, this, &StartDevicesOp::onProgStarted);
 
     // Send start command to all devices
     for(CAdevId devId : m_devices)
@@ -72,18 +72,18 @@ void StartDevicesOp::onProgStarted(CAdevId devId)
         return;
     }
 
-    if(!m_devices.empty())
+    int progr = std::min(static_cast<int>(100.0f * (m_nDevices - m_devices.size()) / m_nDevices), 99);
+    progress(QStringLiteral("Unlocked device %1 (%2 of %3)")
+             .arg(devIdStr(devId)).arg(m_devices.size() + 1).arg(m_nDevices),
+             progr);
+
+    if(m_devices.empty())
     {
-        int progr = std::min(static_cast<int>(0.01f * (m_nDevices - m_devices.size()) / m_nDevices), 99);
-        progress(QStringLiteral("Unlocked device %1 (%1 of %2)")
-                 .arg(devIdStr(devId)).arg(m_devices.size()).arg(m_nDevices),
-                 progr);
-    }
-    else
-    {
+        // IMPORTANT: disconnect ourselves from any future events
+        disconnect(comms().get(), &ca::Comms::progStarted, this, &StartDevicesOp::onProgStarted);
+
         // Done!
-        progress(QStringLiteral("Unlocked %1 devices").arg(m_devices.size()).arg(m_nDevices),
-                 100);
+        progress(QStringLiteral("Unlocked %1 device[s]").arg(m_nDevices), 100);
     }
 }
 
@@ -104,7 +104,7 @@ void StopDevicesOp::started()
     }
 
     // Listen for when a device gets stopped
-    connect(comms().get(), &ca::Comms::progEnd, this, &StopDevicesOp::onProgEnd);
+    connect(comms().get(), &ca::Comms::progEnded, this, &StopDevicesOp::onProgEnd);
 
     // Send stop command to all devices
     for(CAdevId devId : m_devices)
@@ -121,18 +121,18 @@ void StopDevicesOp::onProgEnd(CAdevId devId)
         return;
     }
 
-    if(!m_devices.empty())
+    int progr = std::min(static_cast<int>(100.0f * (m_nDevices - m_devices.size()) / m_nDevices), 99);
+    progress(QStringLiteral("Locked device %1 (%2 of %3)")
+             .arg(devIdStr(devId)).arg(m_devices.size() + 1).arg(m_nDevices),
+             progr);
+
+    if(m_devices.empty())
     {
-        int progr = std::min(static_cast<int>(0.01f * (m_nDevices - m_devices.size()) / m_nDevices), 99);
-        progress(QStringLiteral("Locked device %1 (%1 of %2)")
-                 .arg(devIdStr(devId)).arg(m_devices.size()).arg(m_nDevices),
-                 progr);
-    }
-    else
-    {
+        // IMPORTANT: disconnect ourselves from any future events
+        disconnect(comms().get(), &ca::Comms::progEnded, this, &StopDevicesOp::onProgEnd);
+
         // Done!
-        progress(QStringLiteral("Locked %1 devices").arg(m_devices.size()).arg(m_nDevices),
-                 100);
+        progress(QStringLiteral("Locked %1 device[s]").arg(m_nDevices), 100);
     }
 }
 
@@ -247,16 +247,21 @@ void FlashElfOp::onPageFlashed(CAdevId devId, uint32_t pageAddr)
     // [15..100%]: Page flashing
     m_flashMap.pages().erase(pageAddr);
 
+    size_t nPagesFlashed = m_flashMap.numPages() - m_flashMap.pages().size();
+    constexpr int prevProgress = 15;
+    int progr = std::min(prevProgress + static_cast<int>(float(100 - prevProgress) * nPagesFlashed / m_flashMap.numPages()), 99);
+    progress(QStringLiteral("Flashed %2 of %3 to %1")
+             .arg(devIdS).arg(nPagesFlashed).arg(m_flashMap.numPages()), progr);
+
     if(m_flashMap.pages().empty())
     {
+        // IMPORTANT: Make sure to disconnect ourselves from all future events
+        disconnect(comms().get(), &Comms::pageFlashed, this, &FlashElfOp::onPageFlashed);
+        disconnect(comms().get(), &Comms::pageFlashErrored, this, &FlashElfOp::onPageFlashErrored);
+
         progress(QStringLiteral("Done flashing %1").arg(devIdS), 100);
         return;
     }
-
-    size_t nPagesFlashed = m_flashMap.numPages() - m_flashMap.pages().size();
-    int progr = std::min(static_cast<int>(0.01f * nPagesFlashed / m_flashMap.numPages()), 99);
-    progress(QStringLiteral("Flashed %2 of %3 to %1")
-             .arg(devIdS).arg(nPagesFlashed).arg(m_flashMap.numPages()), progr);
 
     auto nextPage = m_flashMap.pages().begin();
     comms()->flashPage(devId, nextPage->first, nextPage->second);

@@ -88,22 +88,35 @@ bool CAinst::init(QSharedPointer<QCanBusDevice> can)
 
 void CAinst::addOperation(ca::Operation *operation)
 {
+    Q_ASSERT(operation);
+    if(!operation)
+    {
+        return;
+    }
+
+    // Reparent the operation to us; we will be the ones destroying it
+    operation->setParent(this);
+
     m_operations.emplace_back(operation);
-    ca::Operation *op = m_operations.back().get();
+    ca::Operation *op = m_operations.back();
 
     // When the operation is done remove it from the queue and start the first
     // enqueued operation that is still to be started, if any
     connect(&op->onProgress(), &ca::ProgressHandler::done, [op, this]()
     {
-        std::remove_if(m_operations.begin(), m_operations.end(),
-                       [op](auto &opPtr) { return opPtr.get() == op; });
+        // Erase all references to this operation in the queue
+        m_operations.erase(std::remove(m_operations.begin(), m_operations.end(), op),
+                           m_operations.end());
+
+        // Mark the operation as "to be deleted"; let Qt delete it ASAP
+        op->deleteLater();
 
         for(auto it = m_operations.begin(); it != m_operations.end(); it ++)
         {
-            ca::Operation &nextOp = *it->get();
-            if(!nextOp.isStarted())
+            ca::Operation *nextOp = *it;
+            if(!nextOp->isStarted())
             {
-                nextOp.start(m_comms, &m_logHandler);
+                nextOp->start(m_comms, &m_logHandler);
                 break;
             }
         }
