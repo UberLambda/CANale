@@ -137,16 +137,16 @@ inline QString hexStr(Num num, int nDigits=0)
             + QStringLiteral("%1").arg(num, nDigits, 16, QChar('0')).toUpper();
 }
 
-/// Reads a (signed) integer from a string. Supports hex (0x<n>), binary (0b<n>) and octal (0<n>).
+/// Reads a (signed) integer from a string. Supports hex (0x<n>), binary (0b<n>) and octal (0o<n>).
 /// Returns true on success or false on parsing error.
 inline bool parseInt(const QString &str, long &outNum)
 {
     QRegularExpression re("^("
-                          "(?<sign>[+-])?"
-                          "(0x(?<hexNum>[0-9A-Ea-e]+))"
-                          "|(0b(?<binNum>([01]+))"
-                          "|(0(?<octNum>([0-7]+))"
-                          "|(?<decNum>([0-9]+))"
+                          "(?P<sign>[+-])?"
+                          "(0[xX](?P<hexNum>[0-9A-Ea-e]+))"
+                          "|(0[bB](?P<binNum>[01]+))"
+                          "|(0[oO](?P<octNum>[0-7]+))"
+                          "|(?P<decNum>[0-9]+)"
                           ")$");
     auto match = re.match(str);
 
