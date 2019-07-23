@@ -16,6 +16,7 @@
 #include <QByteArray>
 #include <QSharedPointer>
 #include <elfio/elfio.hpp>
+#include "api.h"
 #include "types.hh"
 #include "elf.hh"
 
@@ -28,7 +29,7 @@ struct DeviceStats; // (#include "comms.hh")
 
 /// An operation involving `Comms`; it sends and receives messages/ACKs and keeps
 /// track of its own progress.
-class Operation : public QObject
+class CA_API Operation : public QObject
 {
     Q_OBJECT
 
@@ -120,7 +121,7 @@ private:
 
 /// An `Operation` that sends PROG_REQ + UNLOCK commands to a list of devices
 /// (and waits for their response).
-class StartDevicesOp : public Operation
+class CA_API StartDevicesOp : public Operation
 {
     Q_OBJECT
 
@@ -142,7 +143,7 @@ private slots:
 
 /// An `Operation` that sends PROG_DONE commands to a list of devices (and
 /// waits for their response).
-class StopDevicesOp : public Operation
+class CA_API StopDevicesOp : public Operation
 {
     Q_OBJECT
 
@@ -166,7 +167,7 @@ private slots:
 ///
 /// Retries flashing a page until it succeeds (CRC matching); potentially
 /// retries forever!
-class FlashElfOp : public Operation
+class CA_API FlashElfOp : public Operation
 {
     Q_OBJECT
 

@@ -10,26 +10,15 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include "api.h"
 
 #ifndef __cplusplus
 extern "C"
 {
 #endif
 
-#if defined(WIN32) || defined(_WIN32)
-#   if defined(CA_EXPORTS)
-#       define CA_API __declspec(dllexport)
-#   else
-#       define CA_API __declspec(dllimport)
-#   endif
-#elif defined(__GNUC__) || defined(__clang__)
-#   define CA_API __attribute__((visibility("default")))
-#else
-#   define CA_API
-#endif
-
 /// An opaque handle to an instance of CANale.
-typedef struct CAinst CAinst;
+typedef struct CA_API CAinst CAinst;
 
 /// The level of a CANale log message.
 typedef enum CAlogLevel
@@ -45,7 +34,7 @@ typedef enum CAlogLevel
 typedef void(*CAlogHandler)(CAlogLevel level, const char *message);
 
 /// Configuration flags for creating a CANale instance.
-typedef struct CAconfig
+typedef struct CA_API CAconfig
 {
     /// The CAN backend to use to connect to the CANnuccia network.
     /// Should be the name of the QtCanBus plugin to use (ex. "socketcan").

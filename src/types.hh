@@ -16,13 +16,14 @@
 extern "C"
 {
 #include "canale.h"
+#include "api.h"
 }
 
 namespace ca
 {
 
 /// A C++/Qt equivalent of a `CAprogressHandler` and its user data.
-struct ProgressHandler : public QObject
+struct CA_API ProgressHandler : public QObject
 {
     Q_OBJECT
 
@@ -130,7 +131,7 @@ public slots:
 };
 
 /// A C++/Qt equivalent of a `CAlogHandler`.
-struct LogHandler : public QObject
+struct CA_API LogHandler : public QObject
 {
     Q_OBJECT
 

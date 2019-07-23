@@ -27,7 +27,7 @@ namespace ca
     using Inst = ::CAinst;
 }
 
-struct CAinst : public QObject
+struct CA_API CAinst : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(ca::LogHandler logHandler READ logHandler WRITE setLogHandler)
