@@ -77,7 +77,7 @@ class EmulatedDevice:
         UNLOCKED = 2
         DONE = 3
 
-    def __init__(self, id: int, page_size: int = 1024, num_pages: int = 128, elf_machine: int = 83):
+    def __init__(self, id: int, page_size: int = 1024, num_pages: int = 128, elf_machine: int = 83, base_addr: int = 0x00000000):
         self.id = id
         '''The if of the emulated device.'''
         self.page_size = page_size
@@ -86,6 +86,8 @@ class EmulatedDevice:
         '''The total number of pages of size `page_size` in the device.'''
         self.elf_machine = elf_machine
         '''The ELF machine type of the device.'''
+        self.base_addr = base_addr
+        '''The logical address of the first page in flash.'''
 
         self.state = EmulatedDevice.State.IDLE
         '''The current CANnuccia state of the device.'''
@@ -199,7 +201,7 @@ class TesterListener(can.Listener):
 
         log.info(f'SELECT_PAGE at 0x{page_addr:X} for 0x{dev.id:X}')
 
-        if page_addr >= (dev.num_pages * dev.page_size):
+        if page_addr >= dev.base_addr + (dev.num_pages * dev.page_size):
             log.warning('Page out of bounds')
             return
 
@@ -283,7 +285,7 @@ if __name__ == '__main__':
 
     listener = TesterListener(bus, {
         0xAA: EmulatedDevice(0xAA, 1024, 32, 83),  # 32kB flash AVR microcontroller (ex. ATMega328P)
-        0xBB: EmulatedDevice(0xBB, 1024, 64, 40),  # 64kB flash ARM microcontroller (ex. STM32 blue pill)
+        0xBB: EmulatedDevice(0xBB, 1024, 64, 40, 0x08000000),  # 64kB flash ARM microcontroller (ex. STM32 blue pill)
     })
 
     notifier = can.Notifier(bus, [listener])
