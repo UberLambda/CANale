@@ -8,7 +8,7 @@ CANale needs an interface to send CAN commands to CANnuccia devices; see [here](
 The project should compile and run on Windows, MacOS and Linux. Tested on:
 
 Platform | Architecture | Compiler
-:-:|:-:|:-:|:-:
+:-------:|:------------:|:-------:|
 Manjaro Linux | x86_64 | Clang 8.0
 Windows 10 | x86_64 | MSVC 15 + Clang
 
